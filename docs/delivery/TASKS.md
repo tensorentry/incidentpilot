@@ -11,7 +11,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | Task | Work | Status | Record |
 |---|---|---|---|
 | T0.1 | Repo bootstrap | done | [T0.1](tasks/T0.1.md) |
-| T0.2 | Toolchain and `make check` | todo | |
+| T0.2 | Toolchain and `make check` | done | [T0.2](tasks/T0.2.md) |
 | T0.3 | Settings and modes | todo | |
 | T0.4 | CI workflow | todo | |
 | T0.5 | Spec errata E1–E17 (blocks M1) | todo | |
