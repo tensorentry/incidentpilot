@@ -23,6 +23,16 @@ make format  # apply formatting and safe lint fixes
 
 `uv` downloads its own Python 3.12, so a system Python isn't used.
 
+## Configuration
+
+Copy `.env.example` to `.env`. With no configuration, the app runs in `offline_demo` mode and sends nothing off this machine.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `INCIDENTPILOT_MODE` | `offline_demo` | `offline_demo`, `live` or `replay` |
+| `INCIDENTPILOT_PROVIDER_API_KEY` | none | Required in `live` mode |
+| `INCIDENTPILOT_TRACE_EXPORT_ENABLED` | `false` | Export SDK traces; `live` mode only |
+
 ## License
 
 [MIT](LICENSE)
