@@ -23,6 +23,8 @@ make format  # apply formatting and safe lint fixes
 
 `uv` downloads its own Python 3.12, so a system Python isn't used.
 
+CI runs `make check` with the network disabled, so a test that needs network or keys fails.
+
 ## Configuration
 
 Copy `.env.example` to `.env`. With no configuration, the app runs in `offline_demo` mode and sends nothing off this machine.
