@@ -22,3 +22,7 @@ make format  # apply formatting and safe lint fixes
 ```
 
 `uv` downloads its own Python 3.12, so a system Python isn't used.
+
+## License
+
+[MIT](LICENSE)
