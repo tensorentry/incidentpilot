@@ -1,0 +1,55 @@
+erDiagram
+  INCIDENT ||--o{ INVESTIGATION : has
+  INVESTIGATION ||--o{ ATTEMPT : executes
+  INVESTIGATION ||--o{ RUN_EVENT : emits
+  INVESTIGATION ||--o{ INVESTIGATION_EVIDENCE : authorizes
+  EVIDENCE ||--o{ INVESTIGATION_EVIDENCE : visible_to
+  ATTEMPT ||--o{ MODEL_CALL : requests
+  ATTEMPT ||--o{ TOOL_CALL : invokes
+  TOOL_CALL ||--o{ TOOL_EVIDENCE : yields
+  EVIDENCE ||--o{ TOOL_EVIDENCE : produced_by
+  INVESTIGATION ||--o{ REPORT_CANDIDATE : evaluates
+  INVESTIGATION ||--o| DIAGNOSIS_REPORT : publishes
+  DIAGNOSIS_REPORT ||--o{ ACTION_PROPOSAL : recommends
+  ACTION_PROPOSAL ||--o{ ACTION_DECISION : receives
+  ACTION_PROPOSAL ||--o| ACTION_EXECUTION : executes
+  SCENARIO_INSTANCE ||--o{ ACTION_EXECUTION : mutates
+  INVESTIGATION ||--o{ IDEMPOTENCY_REQUEST : creates_from
+  CAPACITY_SLOT ||--o| ATTEMPT : holds
+  INCIDENT {
+    uuid id PK
+    string title
+    string service
+    datetime created_at
+  }
+  INVESTIGATION {
+    uuid id PK
+    uuid incident_id FK
+    string snapshot_id
+    string status
+    int lease_epoch
+    datetime deadline_at
+  }
+  ATTEMPT {
+    uuid id PK
+    uuid investigation_id FK
+    int attempt_no
+    string status
+  }
+  EVIDENCE {
+    uuid id PK
+    string snapshot_id
+    string content_sha256
+    string source_ref
+  }
+  DIAGNOSIS_REPORT {
+    uuid id PK
+    uuid investigation_id FK
+    string diagnostic_outcome
+    string report_sha256
+  }
+  RUN_EVENT {
+    uuid investigation_id FK
+    int seq
+    string event_type
+  }

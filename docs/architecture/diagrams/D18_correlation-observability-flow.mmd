@@ -1,0 +1,12 @@
+flowchart TB
+  INC["incident_id"] --> INV["investigation_id"]
+  INV --> ATT["attempt_id + lease_epoch"]
+  ATT --> MOD["model_call_id + provider request ID"]
+  ATT --> TOOL["invocation_id + gateway span"]
+  TOOL --> EV["evidence_id + snapshot_id"]
+  INV --> REP["report hash + validation status"]
+  INV --> EVT["run_event sequence"]
+  ATT -.-> O["Sanitized local OpenTelemetry spans"]
+  MOD -.-> O
+  TOOL -.-> O
+  REP -.-> O

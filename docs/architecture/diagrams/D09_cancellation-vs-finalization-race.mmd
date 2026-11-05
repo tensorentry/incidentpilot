@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  actor User as Engineer
+  participant API as API cancel handler
+  participant DB as PostgreSQL
+  participant W as Worker finalizer
+  User->>API: POST /investigations/{id}/cancel
+  par Competing transactions
+    API->>DB: Lock investigation row
+    W->>DB: Lock same investigation row
+  end
+  alt Cancellation obtains lock first
+    DB-->>API: State RUNNING, fence current
+    API->>DB: Set CANCELLED + invalidate epoch + append event
+    DB-->>W: Now CANCELLED; reject publication
+    API-->>User: 200 cancelled
+  else Finalization obtains lock first
+    DB-->>W: State VALIDATING, correct epoch
+    W->>DB: Publish report, COMPLETED, release slot, append event
+    DB-->>API: Already COMPLETED
+    API-->>User: 409 terminal conflict + current state
+  end

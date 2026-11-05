@@ -1,0 +1,39 @@
+flowchart TB
+  subgraph UX["Presentation"]
+    CLI["CLI"]
+    WEB["React Dashboard - P1"]
+  end
+  subgraph API["API process"]
+    HTTP["FastAPI HTTP/SSE"]
+    AUTH["Local auth, object authorization, CSRF"]
+    SVC["Incident & investigation application services"]
+  end
+  subgraph WRK["Worker process"]
+    CL["Claim / lease / recover / cancel observer"]
+    ORCH["Investigation workflow"]
+    MR["InvestigatorRunner model adapter"]
+    AG["Single SDK investigator agent"]
+    GW["Policy & diagnostic tool gateway"]
+    REP["Report validator + fallback"]
+  end
+  subgraph CORE["Shared domain modules"]
+    MOD["Typed schemas / state transitions"]
+    EVID["Evidence store & computation"]
+    POL["AuthZ, quota, redaction, scope"]
+    ADAP["Fixture telemetry adapters"]
+  end
+  DB[("PostgreSQL: single authority")]
+  LLM["LLM provider - live only"]
+  LAB["Immutable telemetry snapshots"]
+  CLI --> HTTP
+  WEB --> HTTP
+  HTTP --> AUTH --> SVC --> DB
+  CL <--> DB
+  CL --> ORCH --> MR --> AG
+  MR <--> LLM
+  AG --> GW --> POL
+  GW --> ADAP --> LAB
+  GW --> EVID --> DB
+  ORCH --> REP --> DB
+  SVC --> MOD
+  ORCH --> MOD

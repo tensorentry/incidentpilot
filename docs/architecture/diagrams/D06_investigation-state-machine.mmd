@@ -1,0 +1,18 @@
+stateDiagram-v2
+  [*] --> QUEUED: Start validated investigation
+  QUEUED --> RUNNING: Claimed
+  QUEUED --> CANCELLED: Cancel
+  QUEUED --> FAILED: Queue age / invalid setup
+  RUNNING --> VALIDATING: Candidate or fallback assembled
+  RUNNING --> RETRY_WAIT: Recoverable attempt failure
+  RUNNING --> CANCELLED: Cancel wins lock
+  RUNNING --> FAILED: Unrecoverable failure
+  RETRY_WAIT --> RUNNING: Reclaimed within budget
+  RETRY_WAIT --> CANCELLED: Cancel
+  RETRY_WAIT --> FAILED: Retry/deadline exhausted
+  VALIDATING --> COMPLETED: Valid report or admissible fallback
+  VALIDATING --> CANCELLED: Cancel wins lock
+  VALIDATING --> FAILED: No admissible report
+  COMPLETED --> [*]
+  CANCELLED --> [*]
+  FAILED --> [*]

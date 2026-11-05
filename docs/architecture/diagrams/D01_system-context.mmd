@@ -1,0 +1,9 @@
+flowchart LR
+    E["Engineer / Reviewer"] -->|"CLI or local browser"| IP["IncidentPilot"]
+    IP -->|"Read-only, typed queries"| LAB["Synthetic incident laboratory"]
+    IP -->|"Sanitized requests, live mode only"| LLM["Model provider"]
+    IP -->|"Store state/evidence/events"| PG[("Local PostgreSQL")]
+    IP -->|"Sanitized spans, optional"| O["Local observability sink"]
+    E -->|"Approve a simulated proposal"| IP
+    IP -->|"P1 transactional mutation"| SIM["Simulator instance"]
+    SIM -.->|"New versioned snapshot"| LAB

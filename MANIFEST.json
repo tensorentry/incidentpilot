@@ -1,0 +1,29 @@
+{
+  "version": "3.0",
+  "status": "proposed",
+  "design_sha256": "c140a3c46f39390f5d4b65ed8cf58eab5fda0728262c9f60766e1ed197771308",
+  "diagram_count": 19,
+  "files": [
+    "README.md",
+    "docs/IncidentPilot_v3_Technical_Design.md",
+    "docs/architecture/diagrams/D01_system-context.mmd",
+    "docs/architecture/diagrams/D02_logical-components.mmd",
+    "docs/architecture/diagrams/D03_local-deployment-and-processes.mmd",
+    "docs/architecture/diagrams/D04_data-and-authorization-trust-boundaries.mmd",
+    "docs/architecture/diagrams/D05_end-to-end-api-worker-report-sequence.mmd",
+    "docs/architecture/diagrams/D06_investigation-state-machine.mmd",
+    "docs/architecture/diagrams/D07_bounded-agent-tool-selection-loop.mmd",
+    "docs/architecture/diagrams/D08_worker-claim-lease-expiration-and-fenced-recovery.mmd",
+    "docs/architecture/diagrams/D09_cancellation-vs-finalization-race.mmd",
+    "docs/architecture/diagrams/D10_domain-entity-relationship-diagram.mmd",
+    "docs/architecture/diagrams/D11_tool-dispatch-and-evidence-commit-sequence.mmd",
+    "docs/architecture/diagrams/D12_evidence-provenance-and-context-path.mmd",
+    "docs/architecture/diagrams/D13_three-stage-report-validation.mmd",
+    "docs/architecture/diagrams/D14_atomic-budget-reservation-and-model-usage-settlement.mmd",
+    "docs/architecture/diagrams/D15_durable-sse-reconnect-and-idempotent-ui-projection.mmd",
+    "docs/architecture/diagrams/D16_approval-and-transactional-simulator-execution.mmd",
+    "docs/architecture/diagrams/D17_oracle-isolated-evaluation-pipeline.mmd",
+    "docs/architecture/diagrams/D18_correlation-observability-flow.mmd",
+    "docs/architecture/diagrams/D19_learning-mvp-durable-showcase-dependency-roadmap.mmd"
+  ]
+}

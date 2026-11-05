@@ -1,0 +1,14 @@
+flowchart TD
+  C["LLM candidate report"] --> S{"Structural integrity?"}
+  S -->|"No"| ERR["Explicit errors for bounded repair"]
+  S -->|"Yes"| NUM{"Numeric & temporal checks?"}
+  NUM -->|"No"| ERR
+  NUM -->|"Yes"| SEM["Semantic support status"]
+  SEM --> PUB["Publish precise validation labels"]
+  ERR --> B{"Single repair available and within reserve?"}
+  B -->|"Yes"| REP["Repair with same evidence only"]
+  REP --> S
+  B -->|"No"| AB["Deterministic abstention / execution failure"]
+  AB --> PUB
+  ORACLE["Ground-truth oracle during evaluation only"] -.-> SEM
+  HUMAN["Human/independent review, optional"] -.-> SEM

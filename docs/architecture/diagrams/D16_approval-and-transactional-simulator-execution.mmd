@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  participant R as Published report
+  participant C as Remediation controller
+  participant DB as PostgreSQL
+  actor H as Authenticated reviewer
+  R->>C: Validated eligible recommendation
+  C->>DB: Create immutable proposal with digest, expiry, expected version
+  H->>C: Approve proposal + digest
+  C->>DB: Lock proposal; verify reviewer, state, digest, expiry
+  alt Invalid or stale
+    DB-->>C: Reject / conflict
+    C-->>H: 409 + unchanged simulator
+  else Valid
+    C->>DB: Commit approval + unique execution intent
+    C->>DB: Lock proposal + scenario instance
+    C->>DB: Recheck expiry and expected state version
+    C->>DB: Apply simulator change, increment version, execution/event atomically
+    DB-->>C: EXECUTED, result ID
+    C-->>H: Simulation executed (not verified as fixed)
+    C->>DB: Create separate post-action snapshot
+    C->>DB: Record verification: improved/unchanged/worse/unknown
+  end

@@ -1,0 +1,13 @@
+flowchart LR
+  U["Authenticated user input"] --> V["Schema / scope validation"]
+  F["Untrusted logs, metrics metadata, runbooks"] --> Z["Normalize / redact / bound"]
+  V --> A["Application-owned policy context"]
+  A --> G["Capability gateway"]
+  Z --> G
+  G --> S[("Committed evidence")]
+  S --> P["Bounded model context"]
+  P --> M["Untrusted model output"]
+  M --> R["Schema + reference + numeric validation"]
+  R --> D[("Published report or abstention")]
+  D -.->|"Candidate recommendation"| AP["Separate authenticated approval controller - P1"]
+  AP --> X["Version-checked simulator mutation"]

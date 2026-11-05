@@ -1,0 +1,30 @@
+sequenceDiagram
+  autonumber
+  actor User as Engineer
+  participant API as FastAPI
+  participant DB as PostgreSQL
+  participant W as Worker
+  participant M as Model adapter / Agent
+  participant G as Tool gateway
+  participant F as Fixture adapter
+  User->>API: POST /api/v1/incidents
+  API->>DB: Persist validated incident (idempotent)
+  API-->>User: 201 + incident_id
+  User->>API: POST /incidents/{id}/investigations
+  API->>DB: Freeze snapshot, scope, config, budget; queue
+  API-->>User: 202 + investigation_id, event URL
+  W->>DB: Claim with lock + capacity slot + lease_epoch
+  DB-->>W: attempt_id + epoch + frozen context
+  W->>M: Run bounded investigator
+  M->>G: Diagnostic call with model-visible query
+  G->>DB: Verify scope, fence, reserve quota
+  G->>F: Bounded snapshot read
+  F-->>G: Raw fixture observation + coverage
+  G->>DB: Commit sanitized evidence + tool event under fence
+  G-->>M: Bounded result and committed evidence references
+  M-->>W: Candidate structured report
+  W->>DB: Validate + publish report atomically under fence
+  DB-->>W: Final state COMPLETED
+  User->>API: GET report / subscribe to events
+  API->>DB: Read authorized report + event cursor
+  API-->>User: Evidence-linked assessment

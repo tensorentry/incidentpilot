@@ -1,0 +1,7 @@
+flowchart LR
+  P0["Phase 0: architecture ADRs + executable contracts"] --> P1["Phase 1: fake model + minimal fenced worker"]
+  P1 --> P2["Phase 2: live single agent + 3 contrasting scenarios"]
+  P2 --> P3["Phase 3: full recovery/security/evidence hardening"]
+  P3 --> P4["Phase 4: baselines + family-held-out evaluations"]
+  P4 --> P5["Phase 5: UI + replay + polished GitHub release"]
+  P5 -.-> OPT["P1: simulated approvals / P2: real telemetry + MCP"]

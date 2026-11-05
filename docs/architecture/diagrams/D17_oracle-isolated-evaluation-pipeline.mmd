@@ -1,0 +1,13 @@
+flowchart LR
+  GEN["Seeded fixture generator"] --> PUB["Observation bundle + frozen snapshot"]
+  GEN --> OR["Oracle bundle: cause, tests, expected risk"]
+  PUB --> R1["Baseline A: fixed queries + rules"]
+  PUB --> R2["Baseline B: fixed queries + LLM synthesis"]
+  PUB --> R3["Candidate C: adaptive agent tools"]
+  R1 --> RES["Canonical output + traces + costs"]
+  R2 --> RES
+  R3 --> RES
+  OR --> G["Evaluator-only oracle grader"]
+  RES --> G
+  G --> MET["Per-family measures, intervals, failure cases"]
+  MET --> ART["Versioned JSON + Markdown benchmark"]

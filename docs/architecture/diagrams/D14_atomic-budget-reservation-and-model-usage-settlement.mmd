@@ -1,0 +1,24 @@
+sequenceDiagram
+  autonumber
+  participant AG as Agent runner
+  participant B as Budget controller
+  participant DB as PostgreSQL
+  participant P as Provider
+  AG->>B: Want model request with token/output cap
+  B->>DB: Lock investigation; check state, epoch, deadline, quotas
+  alt Capacity available
+    B->>DB: Reserve model-call count and estimated max cost
+    DB-->>B: Reservation ID
+    B->>P: Dispatch request
+    alt Provider returns usage
+      P-->>B: Response + usage
+      B->>DB: Fence + settle actual usage / release unused estimate
+      B-->>AG: Typed output or tool selection
+    else Provider outcome unknown
+      B->>DB: Mark UNKNOWN; keep conservative reservation
+      B-->>AG: Controlled failure; attempt may recover
+    end
+  else Limit or finalization reserve reached
+    DB-->>B: Denied
+    B-->>AG: Stop diagnostic dispatch; deterministic fallback
+  end

@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  participant A as Worker A
+  participant DB as PostgreSQL
+  participant P as Model provider
+  participant S as Sweeper
+  participant B as Worker B
+  A->>DB: Claim queued work; epoch=7, attempt=A1
+  DB-->>A: Lease valid until T+30s
+  A->>DB: Reserve model call + persist dispatch intent
+  A->>P: Send model request
+  Note over A,P: Worker A crashes or loses DB connectivity
+  S->>DB: Lock investigation; lease expired?
+  DB-->>S: Yes, epoch 7 is expired
+  S->>DB: Mark A1 LOST; release capacity; retry wait
+  B->>DB: Claim recovery; epoch=8, attempt=A2
+  DB-->>B: Reuse committed snapshot and evidence
+  P-->>A: Delayed response may still arrive
+  A->>DB: Attempt to commit response with epoch 7
+  DB-->>A: REJECT stale lease / no mutation
+  B->>DB: Commit evidence/report with epoch 8
+  DB-->>B: Commit permitted if current and unexpired

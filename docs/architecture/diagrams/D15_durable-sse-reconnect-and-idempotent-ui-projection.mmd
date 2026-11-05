@@ -1,0 +1,17 @@
+sequenceDiagram
+  autonumber
+  actor UI as React UI
+  participant A as FastAPI SSE endpoint
+  participant DB as PostgreSQL event log
+  UI->>A: GET /investigations/{id}/events
+  A->>DB: Load owner-scoped events after seq 0
+  DB-->>A: Events 1,2,3
+  A-->>UI: id:1; id:2; id:3
+  Note over UI,A: Network disconnects
+  DB->>DB: Commit event 4, then event 5
+  UI->>A: Reconnect with Last-Event-ID: 3
+  A->>DB: Read events with seq > 3
+  DB-->>A: Events 4,5
+  A-->>UI: id:4; id:5
+  UI->>UI: Deduplicate by seq; rebuild projection
+  Note over A,DB: If cursor aged out: explicit reset + snapshot URL

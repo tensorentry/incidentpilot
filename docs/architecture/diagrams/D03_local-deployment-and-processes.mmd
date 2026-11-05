@@ -1,0 +1,24 @@
+flowchart LR
+  subgraph HOST["Developer host / Docker Compose"]
+    B["Browser localhost"]
+    C["CLI"]
+    subgraph COMPOSE["Isolated local services"]
+      A["API : loopback-bound"]
+      W1["Worker A"]
+      W2["Worker B - optional contention test"]
+      P[("PostgreSQL - private network")]
+      F["Fixture files - read-only mount"]
+      OT["Local OTel collector - optional"]
+    end
+    B --> A
+    C --> A
+    A --> P
+    W1 --> P
+    W2 --> P
+    W1 --> F
+    W2 --> F
+    W1 -.-> OT
+    W2 -.-> OT
+  end
+  W1 -->|"Opt-in live model requests"| EXT["External model provider"]
+  W2 -->|"Opt-in live model requests"| EXT

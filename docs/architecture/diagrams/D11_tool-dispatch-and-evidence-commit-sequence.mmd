@@ -1,0 +1,21 @@
+sequenceDiagram
+  autonumber
+  participant AG as Investigator
+  participant GW as Gateway
+  participant DB as PostgreSQL
+  participant AD as Fixture adapter
+  AG->>GW: get_service_metrics(model parameters)
+  GW->>GW: Schema, scope, window, rate, size checks
+  GW->>DB: Fence + reserve global/per-tool quota atomically
+  DB-->>GW: Reservation committed
+  GW->>AD: Normalized query + frozen snapshot
+  AD-->>GW: Observation + coverage + source version
+  GW->>GW: Sanitize, normalize, compute digest, limit bytes
+  GW->>DB: Fence + persist result/evidence/visibility/event
+  alt Commit valid
+    DB-->>GW: Stable evidence IDs
+    GW-->>AG: Bounded result + committed selectors
+  else Lease lost or cancelled
+    DB-->>GW: Reject stale mutation
+    GW-->>AG: Controlled stale/cancel error; no new evidence IDs
+  end

@@ -1,0 +1,18 @@
+flowchart TD
+  A["Read frozen incident + committed evidence briefing"] --> B["Maintain bounded hypotheses / test plan"]
+  B --> C{"Remaining model/tool/time budget?"}
+  C -->|"No"| AB["Application-produced insufficient-evidence fallback"]
+  C -->|"Yes"| D["Select allowlisted diagnostic tool or finish"]
+  D -->|"Tool"| G["Gateway authorization + reserve + execution"]
+  G --> E{"Usable new evidence?"}
+  E -->|"Yes"| H["Commit and append evidence briefing"]
+  H --> B
+  E -->|"No or repeated query"| I["Record gap / controlled tool failure"]
+  I --> B
+  D -->|"Final output"| J["Structured candidate report"]
+  J --> K["Independent validator"]
+  K -->|"Valid"| PUB["Publish with precise validation labels"]
+  K -->|"Repair within reserve"| FIX["One repair; no new tools"]
+  FIX --> K
+  K -->|"Invalid / no reserve"| AB
+  AB --> PUB

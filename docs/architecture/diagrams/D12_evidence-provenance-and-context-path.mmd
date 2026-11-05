@@ -1,0 +1,12 @@
+flowchart LR
+  R["Fixture or future real telemetry"] --> N["Normalize units/time/coverage"]
+  N --> RED["Redact + limit + canonicalize"]
+  RED --> DB[("Immutable evidence + digest")]
+  DB --> VIS["Investigation visibility grant"]
+  VIS --> SEL["Typed precise evidence selector"]
+  SEL --> PACK["Bounded model briefing"]
+  PACK --> OUT["Candidate observation / hypothesis"]
+  OUT --> CHK["Reference & claim validators"]
+  CHK --> REPORT["Published report or abstention"]
+  ORA["Oracle manifest - evaluator only"] -.->|"Never routed to model"| EVAL["Benchmark grader"]
+  REPORT --> EVAL
