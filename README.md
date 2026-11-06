@@ -1,6 +1,10 @@
-# IncidentPilot v3 Design Package
+# IncidentPilot
 
-This package contains the **proposed** IncidentPilot v3 architecture. No code, tests or benchmarks are implemented by this design package.
+A local-first lab for evidence-linked investigation of simulated service incidents, using one bounded AI investigator. It's a learning and engineering showcase, not a production incident tool.
+
+**Status:** early implementation. The toolchain, settings and core domain types exist. There's no worker, database or agent yet, and no benchmark has been run. See [`docs/delivery/TASKS.md`](docs/delivery/TASKS.md).
+
+## Design documents
 
 - `docs/IncidentPilot_v3_Technical_Design.md` — canonical full engineering specification with 19 GitHub-rendered Mermaid diagrams.
 - `docs/architecture/diagrams/D01_...mmd` through `D19_...mmd` — individual editable Mermaid diagram sources.
@@ -36,6 +40,8 @@ Copy `.env.example` to `.env`. With no configuration, the app runs in `offline_d
 | `INCIDENTPILOT_MODE` | `offline_demo` | `offline_demo`, `live` or `replay` |
 | `INCIDENTPILOT_PROVIDER_API_KEY` | none | Required in `live` mode |
 | `INCIDENTPILOT_TRACE_EXPORT_ENABLED` | `false` | Export SDK traces; `live` mode only |
+
+Unknown `INCIDENTPILOT_` settings are rejected at startup, so a typo can't silently leave `live` mode or tracing on. Other entries in `.env` are ignored.
 
 ## License
 

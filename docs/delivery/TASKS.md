@@ -6,6 +6,8 @@ Single source of truth for task status. Each task goes through understand, plan,
 
 To find a task's commit, run `git log --grep='T0.1'`.
 
+**Reviews:** [R1, staff review of T0.1 to T1.2](reviews/R1.md)
+
 ## M0 — Foundation (IP3-001)
 
 | Task | Work | Status | Record |

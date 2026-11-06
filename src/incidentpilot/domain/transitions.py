@@ -84,19 +84,25 @@ def require_attempt_transition(current: AttemptStatus, target: AttemptStatus) ->
 
 
 def is_terminal_investigation(status: InvestigationStatus) -> bool:
+    _require_type(InvestigationStatus, status)
     return not INVESTIGATION_TRANSITIONS[status]
 
 
 def is_terminal_attempt(status: AttemptStatus) -> bool:
+    _require_type(AttemptStatus, status)
     return not ATTEMPT_TRANSITIONS[status]
 
 
 def _require[S: StrEnum](
     status_type: type[S], table: Mapping[S, frozenset[S]], current: S, target: S
 ) -> None:
-    # StrEnum members equal plain strings, so the wrong type would pass the lookup.
-    # Database rows are untyped, so mypy can't catch this at that boundary.
-    if type(current) is not status_type or type(target) is not status_type:
-        raise TypeError(f"expected {status_type.__name__} values")
+    _require_type(status_type, current, target)
     if target not in table[current]:
         raise IllegalTransitionError(f"{current} cannot change to {target}")
+
+
+def _require_type[S: StrEnum](status_type: type[S], *statuses: S) -> None:
+    # StrEnum members equal plain strings, so the wrong type would pass a table lookup.
+    # Database rows are untyped, so mypy can't catch this at that boundary.
+    if any(type(status) is not status_type for status in statuses):
+        raise TypeError(f"expected {status_type.__name__} values")
