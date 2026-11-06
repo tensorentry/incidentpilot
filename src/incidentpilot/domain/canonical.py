@@ -9,6 +9,7 @@ import json
 import math
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
@@ -18,17 +19,22 @@ class CanonicalizationError(ValueError):
 
 
 def canonical_json(value: object) -> bytes:
-    text = json.dumps(
-        _normalize(value),
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    )
     try:
+        text = json.dumps(
+            _normalize(value),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
         return text.encode("utf-8")
-    except UnicodeEncodeError:
-        raise CanonicalizationError("text is not valid UTF-8") from None
+    except CanonicalizationError:
+        raise
+    except (OverflowError, RecursionError, ValueError):
+        # Out-of-range datetimes, cycles and deep nesting, oversized integers, lone surrogates.
+        pass
+    # Raised out here so the original exception, which holds the value, isn't kept as context.
+    raise CanonicalizationError("value has no canonical encoding")
 
 
 def sha256_digest(value: object) -> str:
@@ -44,7 +50,9 @@ def _normalize(value: object) -> object:
         case float():
             if not math.isfinite(value):
                 raise CanonicalizationError("floats must be finite")
-            return value + 0.0  # Turns -0.0 into 0.0.
+            # Whole numbers become integers, so 1 and 1.0 match, -0.0 becomes 0, and digests
+            # survive storage as JSON numbers, which keep decimal digits but not float syntax.
+            return int(Decimal(float.__repr__(value))) if value.is_integer() else value
         case datetime():
             if value.utcoffset() is None:
                 raise CanonicalizationError("datetimes must have a timezone")

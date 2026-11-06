@@ -177,6 +177,20 @@ def test_attempt_check_rejects_other_status_types(current: Any, target: Any) -> 
         require_attempt_transition(current, target)
 
 
+@pytest.mark.parametrize("status", [AttemptStatus.FAILED, AttemptStatus.LOST, "FAILED"])
+def test_terminal_investigation_check_rejects_other_status_types(status: Any) -> None:
+    with pytest.raises(TypeError, match="InvestigationStatus"):
+        is_terminal_investigation(status)
+
+
+@pytest.mark.parametrize("status", [InvestigationStatus.RUNNING, "RUNNING"])
+def test_terminal_attempt_check_rejects_other_status_types(status: Any) -> None:
+    with pytest.raises(TypeError, match="AttemptStatus"):
+        is_terminal_attempt(status)
+
+
 def test_tables_cannot_be_modified() -> None:
     with pytest.raises(TypeError):
         INVESTIGATION_TRANSITIONS[InvestigationStatus.COMPLETED] = frozenset()  # type: ignore[index]
+    with pytest.raises(TypeError):
+        ATTEMPT_TRANSITIONS[AttemptStatus.LOST] = frozenset()  # type: ignore[index]

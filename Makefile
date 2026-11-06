@@ -10,8 +10,8 @@ lock-check:
 	uv lock --check
 
 format:
-	$(UV_RUN) ruff format .
 	$(UV_RUN) ruff check --fix .
+	$(UV_RUN) ruff format .
 
 lint:
 	$(UV_RUN) ruff format --check .

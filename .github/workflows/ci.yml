@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -29,16 +29,9 @@ jobs:
       - name: Install locked toolchain
         run: make sync
 
-      - name: Confirm the network is disabled
-        run: |
-          if sudo unshare --net curl --silent --max-time 5 https://pypi.org/simple/ > /dev/null; then
-            echo "Network is still reachable"
-            exit 1
-          fi
-
       - name: Run make check with the network disabled
         run: >
           sudo --preserve-env
           unshare --net --setuid "$(id -u)" --setgid "$(id -g)"
-          env "PATH=$PATH" "HOME=$HOME"
+          env "PATH=$PATH" "HOME=$HOME" CI_EXPECT_NO_NETWORK=1
           make check

@@ -21,6 +21,20 @@ SPEC = REPO_ROOT / "docs" / "IncidentPilot_v3_Technical_Design.md"
 D06 = REPO_ROOT / "docs" / "architecture" / "diagrams" / "D06_investigation-state-machine.mmd"
 
 
+NEVER_RETRIED = [
+    FailureCategory.INVALID_INPUT,
+    FailureCategory.FORBIDDEN_SCOPE,
+    FailureCategory.CONFIGURATION_ERROR,
+    FailureCategory.PROGRAMMING_ERROR,
+]
+RETRIED = [
+    FailureCategory.LEASE_LOST,
+    FailureCategory.PROVIDER_ERROR,
+    FailureCategory.TELEMETRY_ERROR,
+    FailureCategory.DATABASE_ERROR,
+]
+
+
 def values(enum: type[StrEnum]) -> set[str]:
     return {member.value for member in enum}
 
@@ -69,34 +83,82 @@ def test_spec_sample_termination_reason_exists() -> None:
     assert TerminationReason("investigator_finished") is TerminationReason.INVESTIGATOR_FINISHED
 
 
-@pytest.mark.parametrize(
-    "category",
-    [
-        FailureCategory.INVALID_INPUT,
-        FailureCategory.FORBIDDEN_SCOPE,
-        FailureCategory.CONFIGURATION_ERROR,
-        FailureCategory.PROGRAMMING_ERROR,
-    ],
-)
+@pytest.mark.parametrize("category", NEVER_RETRIED)
 def test_section_6_6_failures_are_not_retried(category: FailureCategory) -> None:
     assert category.retryable is False
 
 
-@pytest.mark.parametrize(
-    "category",
-    [
-        FailureCategory.LEASE_LOST,
-        FailureCategory.PROVIDER_ERROR,
-        FailureCategory.TELEMETRY_ERROR,
-        FailureCategory.DATABASE_ERROR,
-    ],
-)
+@pytest.mark.parametrize("category", RETRIED)
 def test_transient_failures_are_retried(category: FailureCategory) -> None:
     assert category.retryable is True
 
 
 def test_every_failure_category_has_a_tested_retry_decision() -> None:
-    assert len(FailureCategory) == 8
+    assert set(NEVER_RETRIED) | set(RETRIED) == set(FailureCategory)
+    assert not set(NEVER_RETRIED) & set(RETRIED)
+
+
+def test_event_values_are_pinned() -> None:
+    assert values(EventType) == {
+        "INVESTIGATION_QUEUED",
+        "ATTEMPT_STARTED",
+        "ATTEMPT_LOST",
+        "ATTEMPT_FAILED",
+        "RETRY_SCHEDULED",
+        "MODEL_CALL_DISPATCHED",
+        "MODEL_CALL_SETTLED",
+        "MODEL_CALL_UNKNOWN",
+        "MODEL_CALL_FAILED",
+        "TOOL_CALL_COMPLETED",
+        "TOOL_CALL_FAILED",
+        "EVIDENCE_COMMITTED",
+        "VALIDATION_STARTED",
+        "REPORT_REPAIR_REQUESTED",
+        "REPORT_PUBLISHED",
+        "INVESTIGATION_CANCELLED",
+        "INVESTIGATION_FAILED",
+    }
+
+
+def test_termination_values_are_pinned() -> None:
+    assert values(TerminationReason) == {
+        "investigator_finished",
+        "model_refused",
+        "provider_failure",
+        "turn_limit_reached",
+        "budget_exhausted",
+        "deadline_reached",
+        "finalization_reserve_reached",
+        "retries_exhausted",
+        "queue_age_exceeded",
+        "invalid_setup",
+        "no_admissible_report",
+        "cancelled",
+    }
+
+
+def test_failure_values_are_pinned() -> None:
+    assert values(FailureCategory) == {
+        "LEASE_LOST",
+        "PROVIDER_ERROR",
+        "TELEMETRY_ERROR",
+        "DATABASE_ERROR",
+        "INVALID_INPUT",
+        "FORBIDDEN_SCOPE",
+        "CONFIGURATION_ERROR",
+        "PROGRAMMING_ERROR",
+    }
+
+
+def test_validation_stage_values_are_pinned() -> None:
+    assert values(ValidationStageStatus) == {"passed", "failed", "not_run", "not_assessed"}
+
+
+@pytest.mark.parametrize(
+    "enum", [InvestigationStatus, AttemptStatus, ModelCallState, EventType, FailureCategory]
+)
+def test_upper_case_members_store_their_own_name(enum: type[StrEnum]) -> None:
+    assert all(member.name == member.value for member in enum)
 
 
 @pytest.mark.parametrize(

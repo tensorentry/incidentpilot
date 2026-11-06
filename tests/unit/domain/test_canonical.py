@@ -1,3 +1,4 @@
+import json
 from collections import OrderedDict
 from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -78,12 +79,43 @@ def test_non_finite_floats_are_rejected(value: float) -> None:
         canonical_json({"x": [value]})
 
 
+@pytest.mark.parametrize(
+    ("value", "encoded"),
+    [
+        (1.5, b"1.5"),
+        (0.1, b"0.1"),
+        (-2.25, b"-2.25"),
+        (1e-07, b"1e-07"),
+        (1.0, b"1"),
+        (1e22, b"10000000000000000000000"),
+    ],
+)
+def test_float_encoding_is_pinned(value: float, encoded: bytes) -> None:
+    assert canonical_json(value) == encoded
+
+
+@pytest.mark.parametrize("value", [1, 0, -7, 2**53, 10**22])
+def test_whole_numbers_have_one_digest(value: int) -> None:
+    assert sha256_digest(value) == sha256_digest(float(value))
+
+
+@pytest.mark.parametrize("value", [1.0, 1.5, 1e22, 1.2345678901234567e30, 1e-07, 3.3e-05])
+def test_numbers_survive_storage_as_plain_decimal_text(value: float) -> None:
+    stored = format(Decimal(repr(value)), "f")
+
+    assert canonical_json(json.loads(stored)) == canonical_json(value)
+
+
 def test_negative_zero_equals_zero() -> None:
     assert sha256_digest(-0.0) == sha256_digest(0.0)
 
 
 def test_enums_serialize_as_their_values() -> None:
     assert canonical_json({Colour.RED: Colour.RED}) == b'{"red":"red"}'
+
+
+def test_plain_enums_serialize_as_their_values() -> None:
+    assert canonical_json({Plain.TEXT: Plain.TEXT}) == b'{"red":"red"}'
 
 
 @pytest.mark.parametrize(
@@ -105,9 +137,38 @@ def test_keys_colliding_after_normalization_are_rejected() -> None:
         canonical_json({Plain.TEXT: 1, "red": 2})
 
 
-def test_lone_surrogates_are_rejected() -> None:
-    with pytest.raises(CanonicalizationError, match="UTF-8"):
-        canonical_json("\ud800")
+def nested(depth: int) -> list[object]:
+    root: list[object] = []
+    current = root
+    for _ in range(depth):
+        child: list[object] = []
+        current.append(child)
+        current = child
+    return root
+
+
+def cycle() -> list[object]:
+    value: list[object] = []
+    value.append(value)
+    return value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "\ud800",
+        {"\ud800": 1},
+        10**5000,
+        datetime.min.replace(tzinfo=timezone(timedelta(hours=14))),
+        datetime.max.replace(tzinfo=timezone(timedelta(hours=-14))),
+        cycle(),
+        nested(100_000),
+    ],
+    ids=["surrogate", "surrogate-key", "huge-int", "min-date", "max-date", "cycle", "deep"],
+)
+def test_values_without_an_encoding_raise_the_documented_error(value: object) -> None:
+    with pytest.raises(CanonicalizationError, match="no canonical encoding"):
+        canonical_json(value)
 
 
 def test_errors_never_contain_the_value() -> None:
@@ -117,3 +178,12 @@ def test_errors_never_contain_the_value() -> None:
         canonical_json({"x": {canary}})
 
     assert canary not in str(caught.value)
+    assert str(caught.value) == "unsupported type: set"
+
+
+@pytest.mark.parametrize("value", ["\ud800", 10**5000], ids=["surrogate", "huge-int"])
+def test_failed_encoding_drops_the_original_exception(value: object) -> None:
+    with pytest.raises(CanonicalizationError) as caught:
+        canonical_json({"canary": value})
+
+    assert caught.value.__context__ is None
