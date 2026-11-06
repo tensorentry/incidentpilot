@@ -6,6 +6,10 @@ Single source of truth for task status. Each task goes through understand, plan,
 
 To find a task's commit, run `git log --grep='T0.1'`.
 
+**How work lands on `main`:** each task goes through a pull request, and merges only when CI is green. Branch protection enforces this, so direct pushes to `main` are rejected, including from the owner.
+
+**Before opening a pull request:** `make check` and `make mutate` must both pass. Coverage isn't enough: at R1 it was 100% while real defects went unnoticed.
+
 **Reviews:** [R1, staff review of T0.1 to T1.2](reviews/R1.md)
 
 ## M0 — Foundation (IP3-001)

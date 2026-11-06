@@ -201,6 +201,17 @@ def test_misspelled_opt_out_cannot_leave_live_mode_on(
         load_settings(env_file=env_file)
 
 
+def test_every_unknown_setting_is_listed(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("INCIDENTPILOT_B=1\nINCIDENTPILOT_A=2\n")
+
+    with pytest.raises(
+        ConfigurationError,
+        match=r"^Invalid configuration: unknown settings: INCIDENTPILOT_A, INCIDENTPILOT_B$",
+    ):
+        load_settings(env_file=env_file)
+
+
 def test_unknown_setting_error_names_the_setting_but_not_its_value(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text(f"INCIDENTPILOT_PROVIDER_API_KY={CANARY}\n")
@@ -215,7 +226,9 @@ def test_undecodable_env_file_is_reported_without_its_content(tmp_path: Path) ->
     env_file = tmp_path / ".env"
     env_file.write_bytes(f"INCIDENTPILOT_PROVIDER_API_KEY={CANARY}\n# caf\xe9\n".encode("latin-1"))
 
-    with pytest.raises(ConfigurationError, match="UTF-8") as caught:
+    with pytest.raises(
+        ConfigurationError, match=r"^Invalid configuration: env file can't be read as UTF-8 text$"
+    ) as caught:
         load_settings(env_file=env_file)
 
     assert CANARY not in str(caught.value)
@@ -223,12 +236,12 @@ def test_undecodable_env_file_is_reported_without_its_content(tmp_path: Path) ->
 
 
 def test_explicit_env_file_must_exist(tmp_path: Path) -> None:
-    with pytest.raises(ConfigurationError, match="env file not found"):
+    with pytest.raises(ConfigurationError, match=r"^Invalid configuration: env file not found$"):
         load_settings(env_file=tmp_path / "missing.env")
 
 
 def test_explicit_env_file_cannot_be_a_directory(tmp_path: Path) -> None:
-    with pytest.raises(ConfigurationError, match="env file not found"):
+    with pytest.raises(ConfigurationError, match=r"^Invalid configuration: env file not found$"):
         load_settings(env_file=tmp_path)
 
 

@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := check
-.PHONY: sync lock-check format lint types test check
+.PHONY: sync lock-check format lint types test check mutate
 
 UV_RUN := uv run --frozen
 
@@ -24,3 +24,6 @@ test:
 	$(UV_RUN) pytest
 
 check: lock-check lint types test
+
+mutate:
+	$(UV_RUN) python scripts/mutate.py
