@@ -5,6 +5,7 @@ This package contains the **proposed** IncidentPilot v3 architecture. No code, t
 - `docs/IncidentPilot_v3_Technical_Design.md` — canonical full engineering specification with 19 GitHub-rendered Mermaid diagrams.
 - `docs/architecture/diagrams/D01_...mmd` through `D19_...mmd` — individual editable Mermaid diagram sources.
 - `docs/spec-errata.md` — corrections to the frozen spec. Where the two disagree, the errata win.
+- `docs/adr/` — architecture decision records, including what would reverse each decision.
 
 GitHub renders Mermaid code fences within Markdown. Use a compatible Mermaid viewer/editor to edit standalone `.mmd` files.
 
