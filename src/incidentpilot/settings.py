@@ -1,17 +1,12 @@
 """Process configuration and the run-mode contract (spec §2.3, §15.2)."""
 
-from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
 from pydantic import SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-class RunMode(StrEnum):
-    OFFLINE_DEMO = "offline_demo"
-    LIVE = "live"
-    REPLAY = "replay"
+from incidentpilot.domain.enums import RunMode
 
 
 class ConfigurationError(Exception):

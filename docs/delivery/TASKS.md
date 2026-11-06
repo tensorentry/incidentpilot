@@ -21,7 +21,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 
 | Task | Work | Status | Record |
 |---|---|---|---|
-| T1.1 | Enums, identity types, canonical JSON and digest helper | todo | |
+| T1.1 | Enums, identity types, canonical JSON and digest helper | done | [T1.1](tasks/T1.1.md) |
 | T1.2 | Investigation and attempt state machines | todo | |
 | T1.3 | Model-call and tool reservation ledger transitions | todo | |
 | T1.4 | Evidence and selector models | todo | |

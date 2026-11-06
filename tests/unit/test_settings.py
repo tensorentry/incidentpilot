@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from incidentpilot.settings import ConfigurationError, RunMode, Settings, load_settings
+from incidentpilot.domain.enums import RunMode
+from incidentpilot.settings import ConfigurationError, Settings, load_settings
 
 CANARY = "canary-secret-value-7f3a"
 REPO_ROOT = Path(__file__).resolve().parents[2]
