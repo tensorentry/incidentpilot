@@ -69,13 +69,13 @@ def test_microseconds_are_preserved() -> None:
 
 
 def test_naive_datetime_is_rejected() -> None:
-    with pytest.raises(CanonicalizationError, match="timezone"):
+    with pytest.raises(CanonicalizationError, match=r"^datetimes must have a timezone$"):
         canonical_json(datetime(2026, 11, 4, 18, 0))  # noqa: DTZ001
 
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
 def test_non_finite_floats_are_rejected(value: float) -> None:
-    with pytest.raises(CanonicalizationError, match="finite"):
+    with pytest.raises(CanonicalizationError, match=r"^floats must be finite$"):
         canonical_json({"x": [value]})
 
 
@@ -128,12 +128,12 @@ def test_unsupported_types_are_rejected(value: object) -> None:
 
 
 def test_non_string_keys_are_rejected() -> None:
-    with pytest.raises(CanonicalizationError, match="keys must be strings"):
+    with pytest.raises(CanonicalizationError, match=r"^mapping keys must be strings$"):
         canonical_json({1: "a"})
 
 
 def test_keys_colliding_after_normalization_are_rejected() -> None:
-    with pytest.raises(CanonicalizationError, match="duplicate key"):
+    with pytest.raises(CanonicalizationError, match=r"^duplicate key after normalization$"):
         canonical_json({Plain.TEXT: 1, "red": 2})
 
 
@@ -167,7 +167,7 @@ def cycle() -> list[object]:
     ids=["surrogate", "surrogate-key", "huge-int", "min-date", "max-date", "cycle", "deep"],
 )
 def test_values_without_an_encoding_raise_the_documented_error(value: object) -> None:
-    with pytest.raises(CanonicalizationError, match="no canonical encoding"):
+    with pytest.raises(CanonicalizationError, match=r"^value has no canonical encoding$"):
         canonical_json(value)
 
 

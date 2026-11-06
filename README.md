@@ -25,6 +25,7 @@ Install [uv](https://docs.astral.sh/uv/), then:
 make sync    # install the locked toolchain; needs network once
 make check   # lock check, formatting, lint, types and tests; needs no network or keys
 make format  # apply formatting and safe lint fixes
+make mutate  # mutation testing; fails if any deliberate bug goes unnoticed
 ```
 
 `uv` downloads its own Python 3.12, so a system Python isn't used.

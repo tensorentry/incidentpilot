@@ -24,10 +24,10 @@ def canonical_json(value: object) -> bytes:
             _normalize(value),
             sort_keys=True,
             separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
+            ensure_ascii=False,  # pragma: no mutate (None behaves the same)
+            allow_nan=False,  # pragma: no mutate (_normalize already rejects these)
         )
-        return text.encode("utf-8")
+        return text.encode()
     except CanonicalizationError:
         raise
     except (OverflowError, RecursionError, ValueError):

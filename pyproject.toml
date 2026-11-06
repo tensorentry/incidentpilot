@@ -14,6 +14,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mutmut>=3.8.1",
     "mypy>=2.4.1",
     "pytest>=9.2.0",
     "ruff>=0.17.4",
@@ -31,7 +32,7 @@ line-length = 100
 target-version = "py312"
 src = ["src", "tests"]
 # Ruff also formats code blocks in Markdown, which would rewrite the frozen spec.
-extend-exclude = ["docs"]
+extend-exclude = ["docs", "mutants"]
 force-exclude = true
 
 [tool.ruff.lint]
@@ -39,12 +40,13 @@ select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4", "PT", "RUF", "S", "DTZ"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
+"scripts/**" = ["S603", "S607"]
 
 [tool.mypy]
 strict = true
 plugins = ["pydantic.mypy"]
 python_version = "3.12"
-files = ["src", "tests"]
+files = ["src", "tests", "scripts"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -52,3 +54,8 @@ testpaths = ["tests"]
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 xfail_strict = true
 filterwarnings = ["error"]
+
+[tool.mutmut]
+source_paths = ["src/incidentpilot/"]
+pytest_add_cli_args_test_selection = ["tests/"]
+also_copy = ["docs", "MANIFEST.json", ".env.example", "README.md", "LICENSE"]

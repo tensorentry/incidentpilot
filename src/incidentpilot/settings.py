@@ -88,6 +88,5 @@ def _unknown_settings(env_file: Path | None) -> list[str]:
 
 def _describe(error: ValidationError) -> str:
     return "; ".join(
-        f"{'.'.join(str(part) for part in item['loc']) or 'settings'}: {item['msg']}"
-        for item in error.errors(include_input=False, include_url=False, include_context=False)
+        f"{item['loc'][0] if item['loc'] else 'settings'}: {item['msg']}" for item in error.errors()
     )
