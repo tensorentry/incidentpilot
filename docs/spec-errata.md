@@ -1,6 +1,6 @@
 # IncidentPilot v3 spec errata
 
-**Status:** Proposed, awaiting sign-off (T0.5)
+**Status:** Accepted 2026-11-05 (T0.5)
 
 The design spec is frozen and its hash is pinned in `MANIFEST.json`, so corrections live here. **Where this file and the spec disagree, this file wins.** Each entry names the spec text it changes.
 

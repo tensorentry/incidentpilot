@@ -14,7 +14,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | T0.2 | Toolchain and `make check` | done | [T0.2](tasks/T0.2.md) |
 | T0.3 | Settings and modes | done | [T0.3](tasks/T0.3.md) |
 | T0.4 | CI workflow | done | [T0.4](tasks/T0.4.md) |
-| T0.5 | Spec errata E1–E17 (blocks M1) | doing | [T0.5](tasks/T0.5.md) |
+| T0.5 | Spec errata E1–E17 (blocks M1) | done | [T0.5](tasks/T0.5.md) |
 | T0.6 | ADRs | todo | |
 
 ## M1 — Contracts (IP3-002)
