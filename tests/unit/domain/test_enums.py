@@ -13,12 +13,14 @@ from incidentpilot.domain.enums import (
     ModelCallState,
     RunMode,
     TerminationReason,
+    ToolCallState,
     ValidationStageStatus,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SPEC = REPO_ROOT / "docs" / "IncidentPilot_v3_Technical_Design.md"
 D06 = REPO_ROOT / "docs" / "architecture" / "diagrams" / "D06_investigation-state-machine.mmd"
+ERRATA = REPO_ROOT / "docs" / "spec-errata.md"
 
 
 NEVER_RETRIED = [
@@ -57,6 +59,13 @@ def test_model_call_states_match_spec() -> None:
     assert match is not None
 
     assert values(ModelCallState) == set(match.group(1).split("|"))
+
+
+def test_tool_call_states_match_errata_e18() -> None:
+    match = re.search(r"`RESERVED → DISPATCHED → ([A-Z|]+)`", ERRATA.read_text())
+    assert match is not None
+
+    assert values(ToolCallState) == {"RESERVED", "DISPATCHED", *match.group(1).split("|")}
 
 
 def test_run_modes_match_spec() -> None:
