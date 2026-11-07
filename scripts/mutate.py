@@ -25,6 +25,8 @@ ENUMS_FILE = Path("src/incidentpilot/domain/enums.py")
 TABLES: dict[str, Mapping[Any, frozenset[Any]]] = {
     "INVESTIGATION_TRANSITIONS": transitions.INVESTIGATION_TRANSITIONS,
     "ATTEMPT_TRANSITIONS": transitions.ATTEMPT_TRANSITIONS,
+    "MODEL_CALL_TRANSITIONS": transitions.MODEL_CALL_TRANSITIONS,
+    "TOOL_CALL_TRANSITIONS": transitions.TOOL_CALL_TRANSITIONS,
 }
 TESTS_FAILED = 1
 ENVIRONMENT = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}

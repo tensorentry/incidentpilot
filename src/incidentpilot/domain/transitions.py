@@ -1,18 +1,33 @@
-"""Legal state changes: spec D06 as corrected by E1, and §6.1 for attempts.
+"""Legal state changes: spec D06 as corrected by E1, §6.1 for attempts, and §11.1 with
+E9 and E18 for the reservation ledger.
 
 These tables say which changes can ever happen. Whether one is allowed right now,
 such as a retry with attempts remaining, depends on data and belongs to callers.
 """
 
 from collections.abc import Mapping
-from enum import StrEnum
+from enum import Enum, StrEnum, auto
 from types import MappingProxyType
 
-from incidentpilot.domain.enums import AttemptStatus, InvestigationStatus
+from incidentpilot.domain.enums import (
+    AttemptStatus,
+    InvestigationStatus,
+    ModelCallState,
+    ToolCallState,
+)
 
 
 class IllegalTransitionError(ValueError):
     """The requested state change is never legal."""
+
+
+class ReservationEffect(Enum):
+    """What a ledger change does to the budget a call reserved. Defined in E18."""
+
+    HOLD = auto()
+    RELEASE = auto()
+    SETTLE = auto()
+    RETAIN = auto()
 
 
 INVESTIGATION_TRANSITIONS: Mapping[InvestigationStatus, frozenset[InvestigationStatus]] = (
@@ -72,6 +87,30 @@ ATTEMPT_TRANSITIONS: Mapping[AttemptStatus, frozenset[AttemptStatus]] = MappingP
     }
 )
 
+MODEL_CALL_TRANSITIONS: Mapping[ModelCallState, frozenset[ModelCallState]] = MappingProxyType(
+    {
+        ModelCallState.RESERVED: frozenset({ModelCallState.DISPATCHED, ModelCallState.FAILED}),
+        ModelCallState.DISPATCHED: frozenset(
+            {ModelCallState.SETTLED, ModelCallState.UNKNOWN, ModelCallState.FAILED}
+        ),
+        ModelCallState.SETTLED: frozenset(),
+        ModelCallState.UNKNOWN: frozenset(),
+        ModelCallState.FAILED: frozenset(),
+    }
+)
+
+TOOL_CALL_TRANSITIONS: Mapping[ToolCallState, frozenset[ToolCallState]] = MappingProxyType(
+    {
+        ToolCallState.RESERVED: frozenset({ToolCallState.DISPATCHED, ToolCallState.FAILED}),
+        ToolCallState.DISPATCHED: frozenset(
+            {ToolCallState.COMPLETED, ToolCallState.UNKNOWN, ToolCallState.FAILED}
+        ),
+        ToolCallState.COMPLETED: frozenset(),
+        ToolCallState.UNKNOWN: frozenset(),
+        ToolCallState.FAILED: frozenset(),
+    }
+)
+
 
 def require_investigation_transition(
     current: InvestigationStatus, target: InvestigationStatus
@@ -83,6 +122,14 @@ def require_attempt_transition(current: AttemptStatus, target: AttemptStatus) ->
     _require(AttemptStatus, ATTEMPT_TRANSITIONS, current, target)
 
 
+def require_model_call_transition(current: ModelCallState, target: ModelCallState) -> None:
+    _require(ModelCallState, MODEL_CALL_TRANSITIONS, current, target)
+
+
+def require_tool_call_transition(current: ToolCallState, target: ToolCallState) -> None:
+    _require(ToolCallState, TOOL_CALL_TRANSITIONS, current, target)
+
+
 def is_terminal_investigation(status: InvestigationStatus) -> bool:
     _require_type(InvestigationStatus, status)
     return not INVESTIGATION_TRANSITIONS[status]
@@ -91,6 +138,56 @@ def is_terminal_investigation(status: InvestigationStatus) -> bool:
 def is_terminal_attempt(status: AttemptStatus) -> bool:
     _require_type(AttemptStatus, status)
     return not ATTEMPT_TRANSITIONS[status]
+
+
+def is_terminal_model_call(state: ModelCallState) -> bool:
+    _require_type(ModelCallState, state)
+    return not MODEL_CALL_TRANSITIONS[state]
+
+
+def is_terminal_tool_call(state: ToolCallState) -> bool:
+    _require_type(ToolCallState, state)
+    return not TOOL_CALL_TRANSITIONS[state]
+
+
+def model_call_effect(current: ModelCallState, target: ModelCallState) -> ReservationEffect:
+    require_model_call_transition(current, target)
+    if target is ModelCallState.DISPATCHED:
+        return ReservationEffect.HOLD
+    if current is ModelCallState.RESERVED:
+        return ReservationEffect.RELEASE
+    if target is ModelCallState.SETTLED:
+        return ReservationEffect.SETTLE
+    return ReservationEffect.RETAIN
+
+
+def tool_call_effect(current: ToolCallState, target: ToolCallState) -> ReservationEffect:
+    require_tool_call_transition(current, target)
+    if target is ToolCallState.DISPATCHED:
+        return ReservationEffect.HOLD
+    if current is ToolCallState.RESERVED:
+        return ReservationEffect.RELEASE
+    return ReservationEffect.RETAIN
+
+
+def model_call_state_on_close(state: ModelCallState) -> ModelCallState:
+    """The state E9 leaves a call in when its attempt closes."""
+    _require_type(ModelCallState, state)
+    if state is ModelCallState.RESERVED:
+        return ModelCallState.FAILED
+    if state is ModelCallState.DISPATCHED:
+        return ModelCallState.UNKNOWN
+    return state
+
+
+def tool_call_state_on_close(state: ToolCallState) -> ToolCallState:
+    """The state E9 leaves a call in when its attempt closes."""
+    _require_type(ToolCallState, state)
+    if state is ToolCallState.RESERVED:
+        return ToolCallState.FAILED
+    if state is ToolCallState.DISPATCHED:
+        return ToolCallState.UNKNOWN
+    return state
 
 
 def _require[S: StrEnum](
