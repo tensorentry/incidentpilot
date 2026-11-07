@@ -35,6 +35,14 @@ class ModelCallState(StrEnum):
     FAILED = "FAILED"
 
 
+class ToolCallState(StrEnum):
+    RESERVED = "RESERVED"
+    DISPATCHED = "DISPATCHED"
+    COMPLETED = "COMPLETED"
+    UNKNOWN = "UNKNOWN"
+    FAILED = "FAILED"
+
+
 class DiagnosticOutcome(StrEnum):
     DIAGNOSED = "diagnosed"
     PARTIAL = "partially_diagnosed"

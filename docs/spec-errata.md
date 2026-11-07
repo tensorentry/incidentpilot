@@ -1,6 +1,6 @@
 # IncidentPilot v3 spec errata
 
-**Status:** Accepted 2026-11-05 (T0.5)
+**Status:** E1–E17 accepted 2026-11-05 (T0.5). E18 proposed at T1.3, awaiting sign-off.
 
 The design spec is frozen and its hash is pinned in `MANIFEST.json`, so corrections live here. **Where this file and the spec disagree, this file wins.** Each entry names the spec text it changes.
 
@@ -25,6 +25,7 @@ Entries marked ⚖️ are judgment calls where the spec gave no clear answer. Th
 | E15 ⚖️ | Unit of evidence | Smallest citable source record; a series counts as one | T1.4 |
 | E16 | Trace tool | `get_trace_summary` is a fifth P0 tool | T4.4 |
 | E17 | Fallback validation | Fallbacks pass through validation; D06 is authoritative | T4.8 |
+| E18 ⚖️ | Tool-call states | Tool calls get a state like model calls; sent calls keep their reservation | T1.3 |
 
 ---
 
@@ -258,3 +259,38 @@ These kinds replace the list in §7.4: `row` is dropped because nothing needs it
 **Problem:** D07 and D13 send fallbacks straight to publication, while D06 routes everything through `VALIDATING`.
 
 **Decision:** D06 is authoritative. Application-generated fallbacks go through `VALIDATING` and the same structural and numeric checks. A fallback that fails is a bug in our code, so there's no repair: the investigation ends `FAILED` with a durable summary.
+
+## E18. Tool-call states and reservation effects ⚖️
+
+**Changes:** §7.2 `tool_calls`, §11.1
+
+**Problem:** E9 says sent tool calls keep their quota and unsent ones release it, but `tool_calls` has no state to tell them apart. Its result status comes from the tool's answer, so it's empty for exactly the calls E9 has to close. §11.1 also leaves out E9's `RESERVED → FAILED`, and doesn't say what a failure after dispatch does to the reservation.
+
+**Decision:**
+- Add `tool_calls.state`, separate from the result status: `RESERVED → DISPATCHED → COMPLETED|UNKNOWN|FAILED`, plus `RESERVED → FAILED`. `COMPLETED` means the result was persisted as `ok`, `empty` or `partial`. `FAILED` means the tool ended in `error`.
+- `DISPATCHED` commits before the adapter is called, and `UNKNOWN` is final, as in E9.
+- A physical tool retry stays on the same row, because an invocation is one logical call. A provider retry is a new `model_calls` row, because each one is metered.
+- `DISPATCHED → FAILED` keeps the reservation. Only a call that was never sent releases.
+- `FAILED` alone doesn't show whether a call was sent, so `model_calls` and `tool_calls` both record `dispatched_at`, set in the transaction that commits `DISPATCHED`. Without it, the investigation's counters couldn't be recomputed from the rows.
+
+Each change has one effect on the reservation:
+
+| Call | From | To | Effect |
+|---|---|---|---|
+| model | `RESERVED` | `DISPATCHED` | hold |
+| model | `RESERVED` | `FAILED` | release |
+| model | `DISPATCHED` | `SETTLED` | settle |
+| model | `DISPATCHED` | `UNKNOWN` | retain |
+| model | `DISPATCHED` | `FAILED` | retain |
+| tool | `RESERVED` | `DISPATCHED` | hold |
+| tool | `RESERVED` | `FAILED` | release |
+| tool | `DISPATCHED` | `COMPLETED` | retain |
+| tool | `DISPATCHED` | `UNKNOWN` | retain |
+| tool | `DISPATCHED` | `FAILED` | retain |
+
+- **hold:** the call stays reserved while in flight.
+- **release:** the request count or quota and the estimate are returned.
+- **settle:** the request stays counted, actual usage replaces the estimate, and the rest is returned.
+- **retain:** the request or quota stays counted, and so does any estimate.
+
+**Why this call:** a definite provider rejection is probably not billed, but §11.1 only allows a release when the provider was certainly not contacted, and guessing wrong would understate spend. **Cost:** repeated rate-limit errors use up the budget and can stop a run early. That ends in an honest stop rather than an overspend.
