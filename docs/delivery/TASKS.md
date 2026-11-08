@@ -22,6 +22,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | T0.4 | CI workflow | done | [T0.4](tasks/T0.4.md) |
 | T0.5 | Spec errata E1–E17 (blocks M1) | done | [T0.5](tasks/T0.5.md) |
 | T0.6 | ADRs | done | [T0.6](tasks/T0.6.md) |
+| T0.7 | Owner isolation: erratum E19 and ADR-014 (blocks T1.4) | done | [T0.7](tasks/T0.7.md) |
 
 ## M1 — Contracts (IP3-002)
 
@@ -49,7 +50,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 
 | Task | Work | Status | Record |
 |---|---|---|---|
-| T3.1 | Compose Postgres, Alembic, runtime role, test harness | todo | |
+| T3.1 | Compose Postgres, Alembic, owner and runtime roles, row-level security helper, two-owner test harness | todo | |
 | T3.2 | Snapshot table and import step | todo | |
 | T3.3 | Minimal sanitizer | todo | |
 | T3.4 | Create-incident service with idempotency | todo | |
@@ -62,6 +63,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | T3.11 | Scripted fake model with real fenced writes | todo | |
 | T3.12 | Atomic terminal publication | todo | |
 | T3.13 | Kill/restart demo | todo | |
+| T3.14 | Cross-owner isolation suite and catalog check (E19) | todo | |
 
 ## M4 — First live agent (IP3-005/006/007)
 

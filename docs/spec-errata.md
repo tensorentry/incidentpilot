@@ -1,6 +1,6 @@
 # IncidentPilot v3 spec errata
 
-**Status:** E1–E17 accepted 2026-11-05 (T0.5). E18 accepted 2026-11-08 (T1.3).
+**Status:** E1–E17 accepted 2026-11-05 (T0.5). E18 accepted 2026-11-08 (T1.3). E19 proposed at T0.7, awaiting sign-off.
 
 The design spec is frozen and its hash is pinned in `MANIFEST.json`, so corrections live here. **Where this file and the spec disagree, this file wins.** Each entry names the spec text it changes.
 
@@ -26,6 +26,7 @@ Entries marked ⚖️ are judgment calls where the spec gave no clear answer. Th
 | E16 | Trace tool | `get_trace_summary` is a fifth P0 tool | T4.4 |
 | E17 | Fallback validation | Fallbacks pass through validation; D06 is authoritative | T4.8 |
 | E18 ⚖️ | Tool-call states | Tool calls get a state like model calls; sent calls keep their reservation | T1.3 |
+| E19 ⚖️ | Owner isolation | Every tenant row has an owner, and PostgreSQL enforces it | T1.4 |
 
 ---
 
@@ -294,3 +295,57 @@ Each change has one effect on the reservation:
 - **retain:** the request or quota stays counted, and so does any estimate.
 
 **Why this call:** a definite provider rejection is probably not billed, but §11.1 only allows a release when the provider was certainly not contacted, and guessing wrong would understate spend. **Cost:** repeated rate-limit errors use up the budget and can stop a run early. That ends in an honest stop rather than an overspend.
+
+## E19. Owner isolation ⚖️
+
+**Changes:** §3.3, §7.2, §7.3, §12.4, D04, D10, E7, E9, E10, E11, E14. §1.4 still excludes multi-tenant hosting.
+
+**Problem:** one owner's data is kept from another's only by checks in each route (§12.4), so one missed filter leaks it. Only `incidents`, `investigations` and `idempotency_requests` have an owner. Snapshots and evidence are shared across owners, and E14's dedup key has no owner. E10 seeds a single owner, so isolation can't even be tested.
+
+**Decision:**
+
+*Invariant.* Add to §3.3: **9. No row belonging to one owner can be read, cited or written in another owner's context. PostgreSQL enforces this, not only application code.**
+
+*Every tenant row has an owner.*
+- `owner_id NOT NULL` goes on every table holding tenant data: `incidents`, `investigations`, `attempts`, `model_calls`, `tool_calls`, `investigation_tool_quota`, `snapshots`, `evidence`, `investigation_evidence`, `tool_evidence`, `report_candidates`, `diagnosis_reports`, `report_assessments`, `run_events` and `idempotency_requests`. P1 action tables follow the same rule when they're built.
+- Every parent has a unique `(owner_id, id)`, and every child references it by `(owner_id, parent_id)`. That makes a cross-owner reference impossible in the schema itself, including an investigation pointing at another owner's incident, parent investigation or snapshot, and a visibility grant joining one owner's investigation to another owner's evidence.
+- Every unique constraint on a tenant table includes `owner_id`. Constraint checks ignore row-level security, so a key without the owner could reveal that another owner's row exists.
+- Only `owners`, `capacity_slots` and the migration table have no owner column.
+
+*Snapshots and evidence are per owner.*
+- This changes E7 and E14. Snapshots are keyed `(owner_id, id)`, and the import step imports a fixture for a named owner. The same fixture imported for two owners becomes two snapshots.
+- E14's dedup key becomes `(owner_id, snapshot_id, source_type, source_ref, adapter_version, redaction_version, content_sha256)`.
+- Selectors carry no owner, because the model never sees one. A selector only resolves inside its investigation's owner.
+
+*PostgreSQL enforces it.*
+- Row-level security is enabled and forced on every tenant table. The policy is `owner_id = NULLIF(current_setting('app.owner_id', true), '')::uuid` for both reads and writes. An unset owner returns no rows and rejects writes, so a forgotten context fails closed. `NULLIF` matters here because the setting reads back as `''`, not `NULL`, once a transaction that set it has ended.
+- The owner is set with `SET LOCAL` at the start of each transaction through one helper, so a pooled connection can't carry it into the next transaction.
+- Runtime roles are never superuser, `BYPASSRLS` or table owner. Migrations run as a separate owner role that the API and workers never use.
+- Any view is created with `security_invoker = true`, because a plain view runs with its creator's rights and would skip the policy.
+
+*A small, closed set of operations can see every owner.*
+- The scheduler has to see every owner, so it gets five `SECURITY DEFINER` functions, each with a pinned `search_path`: admission count (E11), claim selection, expired-lease discovery, slot binding and slot release.
+- They return IDs and counts, never tenant content. Slot binding and release check that the attempt belongs to the current owner.
+- Adding a function to this set needs an erratum.
+- The runtime role has no direct grants on `capacity_slots`.
+
+*Where the owner comes from.*
+- **API:** from the authenticated credential. Another owner's resource is reported as not found, so IDs don't reveal what exists.
+- **Worker:** from the claimed row. The claim selects a job across owners, then the rest of the same transaction runs with that owner set. That covers the attempt row, epoch, slot binding and event. Every later transaction in the attempt also runs under that owner, including tool calls, evidence, the ledger and `close_attempt` (E9).
+- **Sweeper:** finds expired leases across owners, then closes each one under its owner.
+- **Never** from model output or tool arguments, which already can't carry an owner (§8.1).
+
+*Testing.* This changes E10: the migration still seeds one local owner, the CLI takes an owner (defaulting to the local one), and the test database always has two owners. Required tests:
+- For every tenant table, owner A can't read, change or insert owner B's rows, and a transaction with no owner sees none.
+- The composite foreign keys reject every cross-owner reference.
+- A worker on A's investigation can't cite B's evidence, even with a valid ID.
+- Each scheduler function returns only scheduling fields.
+- A catalog check fails the build if any table, unique index, role or definer function breaks the rules above.
+
+*Not included.* Capacity slots and the queue of 20 stay installation-wide, and there are no per-owner spend caps. Real authentication stays with IP3-010.
+
+**Why this call:** the owner goes into keys and foreign keys on every table, so adding it after M3 would mean migrating every table and rewriting dedup. Enforcing it in the database means a missed filter in a route, the gateway or the worker returns nothing instead of another owner's data. **Cost:**
+- Wider keys and indexes.
+- Fixtures stored once per owner.
+- A second access path for the scheduler, in the most delicate code, which needs its own race tests.
+- T3.1 grows, and M3 gains one task, T3.14.
