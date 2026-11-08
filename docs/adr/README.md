@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Each record covers context, options, the decision, consequences and what would reverse it, as spec §18.1 requires. ADR-001 to 010 come from the spec, and ADR-011 to 013 come from accepted errata.
+Each record covers context, options, the decision, consequences and what would reverse it, as spec §18.1 requires. ADR-001 to 010 come from the spec, and ADR-011 to 013 come from accepted errata, and ADR-014 from erratum E19, which is still proposed.
 
 **Accepted means decided, not proven.** No ADR has been validated by a running system yet. Most errata are corrections rather than trade-offs, so they stay in [`spec-errata.md`](../spec-errata.md).
 
@@ -19,3 +19,4 @@ Each record covers context, options, the decision, consequences and what would r
 | [ADR-011](ADR-011-quantities-in-typed-measurements.md) | Quantities only in typed measurements |
 | [ADR-012](ADR-012-request-mode-matches-process-mode.md) | Request mode must match process mode |
 | [ADR-013](ADR-013-evidence-row-is-smallest-citable-record.md) | An evidence row is the smallest citable record |
+| [ADR-014](ADR-014-owner-isolation-in-postgres.md) | PostgreSQL enforces owner isolation (proposed) |
