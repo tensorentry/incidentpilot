@@ -1,7 +1,7 @@
 # ADR-014: PostgreSQL enforces owner isolation
 
-**Status:** Proposed
-**Date:** 2026-11-08
+**Status:** Accepted
+**Date:** 2026-11-10
 **Deciders:** Project owner
 **Source:** Erratum E19
 
