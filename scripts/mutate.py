@@ -1,9 +1,12 @@
 """Mutation testing behind `make mutate`. Exits non-zero if any mutation goes unnoticed.
 
-mutmut covers function bodies but skips module-level tables and enum values, so this
-script also flips every state transition and renames every enum value.
+mutmut covers function bodies but skips decorated functions, such as Pydantic
+validators and properties, along with module-level tables and enum values. So this
+script also mutates decorated functions itself, flips every state transition and
+renames every enum value.
 """
 
+import ast
 import enum
 import inspect
 import itertools
@@ -20,6 +23,7 @@ from incidentpilot.domain import enums, transitions
 
 ROOT = Path(__file__).resolve().parents[1]
 COPIED = ["src", "tests", "docs", "pyproject.toml", "MANIFEST.json", ".env.example", "README.md"]
+SOURCE = Path("src/incidentpilot")
 TRANSITIONS_FILE = Path("src/incidentpilot/domain/transitions.py")
 ENUMS_FILE = Path("src/incidentpilot/domain/enums.py")
 TABLES: dict[str, Mapping[Any, frozenset[Any]]] = {
@@ -29,6 +33,18 @@ TABLES: dict[str, Mapping[Any, frozenset[Any]]] = {
     "TOOL_CALL_TRANSITIONS": transitions.TOOL_CALL_TRANSITIONS,
 }
 TESTS_FAILED = 1
+SWAPPED_COMPARISONS: dict[type[ast.cmpop], type[ast.cmpop]] = {
+    ast.Lt: ast.LtE,
+    ast.LtE: ast.Lt,
+    ast.Gt: ast.GtE,
+    ast.GtE: ast.Gt,
+    ast.Eq: ast.NotEq,
+    ast.NotEq: ast.Eq,
+    ast.Is: ast.IsNot,
+    ast.IsNot: ast.Is,
+    ast.In: ast.NotIn,
+    ast.NotIn: ast.In,
+}
 ENVIRONMENT = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 
 
@@ -57,11 +73,11 @@ def run_mutmut() -> tuple[int, list[str]]:
     return len(mutmut_results(mutmut, "--all", "true")), mutmut_results(mutmut)
 
 
-def pytest_exit_code(copy: Path) -> int:
+def pytest_exit_code(copy: Path, tests: str = "tests/unit/domain") -> int:
     for cache in copy.rglob("__pycache__"):
         shutil.rmtree(cache, ignore_errors=True)
     return subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/unit/domain", "-q", "-x", "-p", "no:cacheprovider"],
+        [sys.executable, "-m", "pytest", tests, "-q", "-x", "-p", "no:cacheprovider"],
         cwd=copy,
         env={**ENVIRONMENT, "PYTHONPATH": str(copy / "src")},
         capture_output=True,
@@ -97,6 +113,78 @@ def enum_mutations(original: str) -> Iterator[tuple[str, str]]:
                     f"{name}.{member.name}",
                     original[:position] + renamed + original[position + len(line) :],
                 )
+
+
+def skipped_by_mutmut(function: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    decorators = function.decorator_list
+    lone_method_decorator = (
+        len(decorators) == 1
+        and isinstance(decorators[0], ast.Name)
+        and decorators[0].id in {"staticmethod", "classmethod"}
+    )
+    return bool(decorators) and not lone_method_decorator
+
+
+def mutation_sites(tree: ast.Module) -> list[tuple[str, ast.AST, int]]:
+    """Each place in a decorated function where one mutation applies, in a stable order."""
+    sites: list[tuple[str, ast.AST, int]] = []
+    for function in ast.walk(tree):
+        if isinstance(function, ast.FunctionDef | ast.AsyncFunctionDef) and skipped_by_mutmut(
+            function
+        ):
+            for statement in function.body:
+                for node in ast.walk(statement):
+                    if isinstance(node, ast.Compare):
+                        sites += [(function.name, node, i) for i in range(len(node.ops))]
+                    elif isinstance(node, ast.BoolOp | ast.IfExp | ast.If) or (
+                        isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not)
+                    ):
+                        sites.append((function.name, node, 0))
+    return sites
+
+
+def apply_mutation(node: ast.AST, index: int) -> str:
+    if isinstance(node, ast.Compare):
+        node.ops[index] = SWAPPED_COMPARISONS[type(node.ops[index])]()
+        return "comparison"
+    if isinstance(node, ast.BoolOp):
+        node.op = ast.Or() if isinstance(node.op, ast.And) else ast.And()
+        return "boolean"
+    if isinstance(node, ast.IfExp):
+        node.body, node.orelse = node.orelse, node.body
+        return "branches"
+    if isinstance(node, ast.If):
+        node.test = ast.UnaryOp(op=ast.Not(), operand=node.test)
+        return "condition"
+    if isinstance(node, ast.UnaryOp):
+        node.operand = ast.UnaryOp(op=ast.Not(), operand=node.operand)
+        return "not"
+    raise TypeError(f"no mutation for {type(node).__name__}")
+
+
+def decorated_mutations(copy: Path) -> Iterator[tuple[Path, str, str]]:
+    for path in sorted((copy / SOURCE).rglob("*.py")):
+        original = path.read_text()
+        for position in range(len(mutation_sites(ast.parse(original)))):
+            tree = ast.parse(original)
+            function, node, index = mutation_sites(tree)[position]
+            line = getattr(node, "lineno", 0)
+            kind = apply_mutation(node, index)
+            name = f"{path.relative_to(copy)}:{line} {function} {kind}"
+            yield path.relative_to(copy), name, ast.unparse(tree)
+
+
+def check_decorated(copy: Path) -> tuple[int, list[str]]:
+    total = 0
+    unnoticed = []
+    for file, name, text in decorated_mutations(copy):
+        original = (copy / file).read_text()
+        (copy / file).write_text(text)
+        total += 1
+        if pytest_exit_code(copy, "tests") != TESTS_FAILED:
+            unnoticed.append(name)
+        (copy / file).write_text(original)
+    return total, unnoticed
 
 
 def check_mutations(
@@ -136,7 +224,7 @@ def main() -> int:
         transitions_text = (copy / TRANSITIONS_FILE).read_text()
         enums_text = (copy / ENUMS_FILE).read_text()
 
-        if pytest_exit_code(copy) != 0:
+        if pytest_exit_code(copy) != 0 or pytest_exit_code(copy, "tests") != 0:
             print("ABORT: tests are already failing, so mutation results would mean nothing")
             return 2
         table = transitions.ATTEMPT_TRANSITIONS
@@ -156,8 +244,10 @@ def main() -> int:
             copy, ENUMS_FILE, enum_mutations(enums_text), enums_text
         )
         print(f"enum values: {values - len(missed_values)}/{values} caught")
+        decorated, missed_decorated = check_decorated(copy)
+        print(f"decorated functions: {decorated - len(missed_decorated)}/{decorated} caught")
 
-    problems = [*survivors, *missed_edges, *missed_values]
+    problems = [*survivors, *missed_edges, *missed_values, *missed_decorated]
     for problem in problems:
         print(f"NOT CAUGHT: {problem}")
     print("All mutations caught." if not problems else f"{len(problems)} mutations not caught.")
