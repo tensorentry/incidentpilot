@@ -1,6 +1,6 @@
 # IncidentPilot v3 spec errata
 
-**Status:** E1–E17 accepted 2026-11-05 (T0.5). E18 accepted 2026-11-08 (T1.3). E19 proposed at T0.7, awaiting sign-off.
+**Status:** E1–E17 accepted 2026-11-05 (T0.5). E18 accepted 2026-11-08 (T1.3). E19 accepted 2026-11-10 (T0.7).
 
 The design spec is frozen and its hash is pinned in `MANIFEST.json`, so corrections live here. **Where this file and the spec disagree, this file wins.** Each entry names the spec text it changes.
 
