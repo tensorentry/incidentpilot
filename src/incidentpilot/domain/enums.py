@@ -43,6 +43,13 @@ class ToolCallState(StrEnum):
     FAILED = "FAILED"
 
 
+class EvidenceKind(StrEnum):
+    METRIC_SERIES_WINDOW = "metric_series_window"
+    LOG_RECORD = "log_record"
+    DEPLOYMENT_RECORD = "deployment_record"
+    SPAN_SUMMARY = "span_summary"
+
+
 class DiagnosticOutcome(StrEnum):
     DIAGNOSED = "diagnosed"
     PARTIAL = "partially_diagnosed"
