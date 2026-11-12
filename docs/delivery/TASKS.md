@@ -34,7 +34,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | T1.4 | Evidence and selector models | done | [T1.4](tasks/T1.4.md) |
 | T1.5 | `ReportCandidate`, `DiagnosisReport`, `Measurement` | done | [T1.5](tasks/T1.5.md) |
 | T1.6 | SDK schema spike (gate: provider and API key) | todo | |
-| T1.7 | Cross-record validators and citation checker | todo | |
+| T1.7 | Cross-record validators and citation checker | done | [T1.7](tasks/T1.7.md) |
 | T1.8 | Tool envelope and error codes | todo | |
 
 ## M2 — Fixtures (IP3-003)
