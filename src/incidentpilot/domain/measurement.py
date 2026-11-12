@@ -12,6 +12,7 @@ from pydantic import AfterValidator, Field, model_validator
 from incidentpilot.domain.contract import Contract
 from incidentpilot.domain.enums import Aggregation, MeasurementUnit
 from incidentpilot.domain.evidence import EvidenceSelector, MetricSeriesWindowSelector
+from incidentpilot.domain.names import MetricName
 from incidentpilot.domain.window import TimeWindow
 
 MAX_ITEMS = 20
@@ -23,7 +24,6 @@ def distinct[T: Hashable](items: list[T]) -> list[T]:
     return items
 
 
-MetricName = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
 Selectors = Annotated[
     list[EvidenceSelector],
     Field(min_length=1, max_length=MAX_ITEMS),

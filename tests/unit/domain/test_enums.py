@@ -15,7 +15,9 @@ from incidentpilot.domain.enums import (
     EventType,
     FailureCategory,
     InvestigationStatus,
+    LogSeverity,
     MeasurementUnit,
+    MetricKind,
     ModelCallState,
     RecommendationKind,
     ReportAuthor,
@@ -144,6 +146,11 @@ def test_measurement_values_are_pinned() -> None:
     assert values(MeasurementUnit) == {"count", "ms", "s", "bytes", "per_second", "ratio"}
 
 
+def test_fixture_values_are_pinned() -> None:
+    assert values(MetricKind) == {"counter", "gauge", "histogram"}
+    assert values(LogSeverity) == {"debug", "info", "warn", "error", "fatal"}
+
+
 def test_report_authors_are_pinned() -> None:
     assert values(ReportAuthor) == {"model", "application"}
 
@@ -261,6 +268,8 @@ def test_stored_values_are_upper_snake_case(enum: type[StrEnum]) -> None:
         StopReason,
         ToolName,
         ToolStatus,
+        MetricKind,
+        LogSeverity,
     ],
 )
 def test_reported_values_are_lower_snake_case(enum: type[StrEnum]) -> None:
