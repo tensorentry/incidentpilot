@@ -41,7 +41,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 
 | Task | Work | Status | Record |
 |---|---|---|---|
-| T2.1 | Fixture schema, snapshot manifest, oracle import contract | todo | |
+| T2.1 | Fixture schema, snapshot manifest, oracle import contract | done | [T2.1](tasks/T2.1.md) |
 | T2.2 | Seeded generator and first case | todo | |
 | T2.3 | Second and third contrasting cases | todo | |
 | T2.4 | Non-leakage test | todo | |

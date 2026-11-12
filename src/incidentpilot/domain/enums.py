@@ -50,6 +50,20 @@ class EvidenceKind(StrEnum):
     SPAN_SUMMARY = "span_summary"
 
 
+class MetricKind(StrEnum):
+    COUNTER = "counter"
+    GAUGE = "gauge"
+    HISTOGRAM = "histogram"
+
+
+class LogSeverity(StrEnum):
+    DEBUG = "debug"
+    INFO = "info"
+    WARN = "warn"
+    ERROR = "error"
+    FATAL = "fatal"
+
+
 class DiagnosticOutcome(StrEnum):
     DIAGNOSED = "diagnosed"
     PARTIAL = "partially_diagnosed"

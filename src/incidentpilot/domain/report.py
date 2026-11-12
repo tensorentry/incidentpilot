@@ -27,6 +27,7 @@ from incidentpilot.domain.enums import (
 )
 from incidentpilot.domain.ids import InvestigationId, SnapshotId
 from incidentpilot.domain.measurement import MAX_ITEMS, Measurement, Selectors, distinct
+from incidentpilot.domain.names import Category, LocalId, ServiceName
 
 MAX_TEXT = 500
 MAX_OBSERVATIONS = 50
@@ -49,9 +50,6 @@ def _no_quantities(text: str) -> str:
 
 
 Prose = Annotated[str, Field(min_length=1, max_length=MAX_TEXT), AfterValidator(_no_quantities)]
-LocalId = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,63}$")]
-ServiceName = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")]
-Category = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 LocalIds = Annotated[list[LocalId], Field(max_length=MAX_ITEMS), AfterValidator(distinct)]
 ProseList = Annotated[list[Prose], Field(max_length=MAX_ITEMS)]
