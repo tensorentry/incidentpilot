@@ -167,6 +167,47 @@ _NEVER_RETRIED = frozenset(
 )
 
 
+class ToolName(StrEnum):
+    """The P0 tools of spec §8.1 and E16. Nothing else is ever registered."""
+
+    GET_SERVICE_METRICS = "get_service_metrics"
+    SEARCH_LOGS = "search_logs"
+    GET_DEPLOYMENTS = "get_deployments"
+    GET_DEPENDENCY_HEALTH = "get_dependency_health"
+    GET_TRACE_SUMMARY = "get_trace_summary"
+
+
+class ToolStatus(StrEnum):
+    OK = "ok"
+    EMPTY = "empty"
+    PARTIAL = "partial"
+    ERROR = "error"
+
+
+class ToolErrorCode(StrEnum):
+    INVALID_ARGUMENT = "INVALID_ARGUMENT"
+    OUT_OF_SCOPE = "OUT_OF_SCOPE"
+    STALE_LEASE = "STALE_LEASE"
+    CANCELLED = "CANCELLED"
+    QUOTA_EXCEEDED = "QUOTA_EXCEEDED"
+    TIMEOUT = "TIMEOUT"
+    SOURCE_UNAVAILABLE = "SOURCE_UNAVAILABLE"
+    RATE_LIMITED = "RATE_LIMITED"
+    CURSOR_INVALID = "CURSOR_INVALID"
+    RESULT_TRUNCATED = "RESULT_TRUNCATED"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
+
+    @property
+    def retryable(self) -> bool:
+        """Whether the same call may succeed later. Every other code needs a change first."""
+        return self in _TRANSIENT_TOOL_ERRORS
+
+
+_TRANSIENT_TOOL_ERRORS = frozenset(
+    {ToolErrorCode.TIMEOUT, ToolErrorCode.SOURCE_UNAVAILABLE, ToolErrorCode.RATE_LIMITED}
+)
+
+
 class EventType(StrEnum):
     INVESTIGATION_QUEUED = "INVESTIGATION_QUEUED"
     ATTEMPT_STARTED = "ATTEMPT_STARTED"
