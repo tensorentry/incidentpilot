@@ -22,7 +22,16 @@ from typing import Any
 from incidentpilot.domain import enums, transitions
 
 ROOT = Path(__file__).resolve().parents[1]
-COPIED = ["src", "tests", "docs", "pyproject.toml", "MANIFEST.json", ".env.example", "README.md"]
+COPIED = [
+    "src",
+    "tests",
+    "docs",
+    "scenarios",
+    "pyproject.toml",
+    "MANIFEST.json",
+    ".env.example",
+    "README.md",
+]
 SOURCE = Path("src/incidentpilot")
 TRANSITIONS_FILE = Path("src/incidentpilot/domain/transitions.py")
 ENUMS_FILE = Path("src/incidentpilot/domain/enums.py")

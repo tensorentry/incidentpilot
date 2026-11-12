@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := check
-.PHONY: sync lock-check format lint types test check mutate
+.PHONY: sync lock-check format lint types test check mutate fixtures
 
 UV_RUN := uv run --frozen
 
@@ -27,3 +27,6 @@ check: lock-check lint types test
 
 mutate:
 	$(UV_RUN) python scripts/mutate.py
+
+fixtures:
+	$(UV_RUN) python -m incidentpilot.evaluation.generate --root scenarios

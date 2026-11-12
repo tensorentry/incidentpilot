@@ -9,15 +9,15 @@ from typing import Annotated, Literal, Self
 from pydantic import AfterValidator, Field, model_validator
 
 from incidentpilot.domain.contract import Contract
-from incidentpilot.domain.enums import CausalRole, DiagnosticOutcome
+from incidentpilot.domain.enums import CausalRole, CauseCategory, DiagnosticOutcome
 from incidentpilot.domain.measurement import distinct
-from incidentpilot.domain.names import Category, ServiceName
+from incidentpilot.domain.names import ServiceName
 from incidentpilot.domain.snapshot import Snapshot
 
 
 class OracleCause(Contract):
     component: ServiceName
-    category: Category
+    category: CauseCategory
     role: CausalRole
 
 

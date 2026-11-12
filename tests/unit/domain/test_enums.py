@@ -9,6 +9,7 @@ from incidentpilot.domain.enums import (
     AlternativeStatus,
     AttemptStatus,
     CausalRole,
+    CauseCategory,
     ClaimKind,
     Confidence,
     DiagnosticOutcome,
@@ -146,6 +147,17 @@ def test_measurement_values_are_pinned() -> None:
     assert values(MeasurementUnit) == {"count", "ms", "s", "bytes", "per_second", "ratio"}
 
 
+def test_cause_categories_are_pinned() -> None:
+    assert '"category": "deployment_regression"' in SPEC.read_text()
+    assert values(CauseCategory) == {
+        "deployment_regression",
+        "dependency_degradation",
+        "resource_saturation",
+        "traffic_surge",
+        "configuration_change",
+    }
+
+
 def test_fixture_values_are_pinned() -> None:
     assert values(MetricKind) == {"counter", "gauge", "histogram"}
     assert values(LogSeverity) == {"debug", "info", "warn", "error", "fatal"}
@@ -270,6 +282,7 @@ def test_stored_values_are_upper_snake_case(enum: type[StrEnum]) -> None:
         ToolStatus,
         MetricKind,
         LogSeverity,
+        CauseCategory,
     ],
 )
 def test_reported_values_are_lower_snake_case(enum: type[StrEnum]) -> None:
