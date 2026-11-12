@@ -109,6 +109,19 @@ class Confidence(StrEnum):
     HIGH = "high"
 
 
+class CauseCategory(StrEnum):
+    """What kind of cause a hypothesis names. Grading compares it exactly (§14.3).
+
+    The list is wider than the cases need, so naming a category is a real choice.
+    """
+
+    DEPLOYMENT_REGRESSION = "deployment_regression"
+    DEPENDENCY_DEGRADATION = "dependency_degradation"
+    RESOURCE_SATURATION = "resource_saturation"
+    TRAFFIC_SURGE = "traffic_surge"
+    CONFIGURATION_CHANGE = "configuration_change"
+
+
 class AlternativeStatus(StrEnum):
     SUPPORTED = "supported"
     CONTRADICTED = "contradicted"

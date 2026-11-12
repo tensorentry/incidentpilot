@@ -15,6 +15,7 @@ from incidentpilot.domain.contract import Contract
 from incidentpilot.domain.enums import (
     AlternativeStatus,
     CausalRole,
+    CauseCategory,
     ClaimKind,
     Confidence,
     DiagnosticOutcome,
@@ -27,7 +28,7 @@ from incidentpilot.domain.enums import (
 )
 from incidentpilot.domain.ids import InvestigationId, SnapshotId
 from incidentpilot.domain.measurement import MAX_ITEMS, Measurement, Selectors, distinct
-from incidentpilot.domain.names import Category, LocalId, ServiceName
+from incidentpilot.domain.names import LocalId, ServiceName
 
 MAX_TEXT = 500
 MAX_OBSERVATIONS = 50
@@ -80,7 +81,7 @@ class Observation(Contract):
 class CausalHypothesis(Contract):
     cause_id: LocalId
     component: ServiceName
-    category: Category
+    category: CauseCategory
     mechanism: Prose
     role: CausalRole
     confidence: Confidence
