@@ -5,13 +5,22 @@ from pathlib import Path
 import pytest
 
 from incidentpilot.domain.enums import (
+    Aggregation,
+    AlternativeStatus,
     AttemptStatus,
+    CausalRole,
+    ClaimKind,
+    Confidence,
     DiagnosticOutcome,
     EventType,
     FailureCategory,
     InvestigationStatus,
+    MeasurementUnit,
     ModelCallState,
+    RecommendationKind,
+    ReportAuthor,
     RunMode,
+    StopReason,
     TerminationReason,
     ToolCallState,
     ValidationStageStatus,
@@ -82,6 +91,58 @@ def test_diagnostic_outcomes_match_spec() -> None:
 
 def test_validation_stage_statuses_cover_errata_e6() -> None:
     assert {"not_run", "not_assessed"} <= values(ValidationStageStatus)
+
+
+@pytest.mark.parametrize(
+    ("field", "enum"),
+    [("claim_kind", ClaimKind), ("role", CausalRole), ("confidence", Confidence)],
+)
+def test_hypothesis_vocabulary_matches_spec_section_7_4(field: str, enum: type[StrEnum]) -> None:
+    match = re.search(rf"{field}: str  # ([a-z |]+)", SPEC.read_text())
+    assert match is not None
+
+    assert values(enum) == set(match.group(1).split(" | "))
+
+
+def test_alternative_statuses_match_spec_section_10_1() -> None:
+    match = re.search(r"\| `alternatives\[\]` \| ([a-z /]+) \|", SPEC.read_text())
+    assert match is not None
+
+    assert values(AlternativeStatus) == set(match.group(1).split(" / "))
+
+
+def test_recommendation_kinds_cover_spec_section_10_1() -> None:
+    assert '"kind": "diagnostic"' in SPEC.read_text()
+    assert values(RecommendationKind) == {"diagnostic", "simulation_candidate"}
+
+
+def test_stop_reasons_are_the_four_errata_e5_names() -> None:
+    assert values(StopReason) == {
+        "model_refused",
+        "provider_failure",
+        "turn_limit_reached",
+        "budget_exhausted",
+    }
+
+
+def test_measurement_values_are_pinned() -> None:
+    assert values(Aggregation) == {
+        "sum",
+        "mean",
+        "min",
+        "max",
+        "rate",
+        "p50",
+        "p90",
+        "p95",
+        "p99",
+        "ratio",
+    }
+    assert values(MeasurementUnit) == {"count", "ms", "s", "bytes", "per_second", "ratio"}
+
+
+def test_report_authors_are_pinned() -> None:
+    assert values(ReportAuthor) == {"model", "application"}
 
 
 def test_events_named_by_spec_exist() -> None:
@@ -180,7 +241,21 @@ def test_stored_values_are_upper_snake_case(enum: type[StrEnum]) -> None:
 
 @pytest.mark.parametrize(
     "enum",
-    [RunMode, DiagnosticOutcome, TerminationReason, ValidationStageStatus],
+    [
+        RunMode,
+        DiagnosticOutcome,
+        TerminationReason,
+        ValidationStageStatus,
+        ClaimKind,
+        Aggregation,
+        MeasurementUnit,
+        CausalRole,
+        Confidence,
+        AlternativeStatus,
+        RecommendationKind,
+        ReportAuthor,
+        StopReason,
+    ],
 )
 def test_reported_values_are_lower_snake_case(enum: type[StrEnum]) -> None:
-    assert all(re.fullmatch(r"[a-z][a-z_]*", value) for value in values(enum))
+    assert all(re.fullmatch(r"[a-z][a-z0-9_]*", value) for value in values(enum))

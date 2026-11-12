@@ -56,6 +56,70 @@ class DiagnosticOutcome(StrEnum):
     INSUFFICIENT = "insufficient_evidence"
 
 
+class ClaimKind(StrEnum):
+    OBSERVED = "observed"
+    COMPUTED = "computed"
+
+
+class Aggregation(StrEnum):
+    SUM = "sum"
+    MEAN = "mean"
+    MIN = "min"
+    MAX = "max"
+    RATE = "rate"
+    P50 = "p50"
+    P90 = "p90"
+    P95 = "p95"
+    P99 = "p99"
+    RATIO = "ratio"
+
+
+class MeasurementUnit(StrEnum):
+    COUNT = "count"
+    MILLISECONDS = "ms"
+    SECONDS = "s"
+    BYTES = "bytes"
+    PER_SECOND = "per_second"
+    RATIO = "ratio"
+
+
+class CausalRole(StrEnum):
+    TRIGGER = "trigger"
+    PROXIMATE = "proximate"
+    CONTRIBUTING = "contributing"
+
+
+class Confidence(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class AlternativeStatus(StrEnum):
+    SUPPORTED = "supported"
+    CONTRADICTED = "contradicted"
+    UNRESOLVED = "unresolved"
+
+
+class RecommendationKind(StrEnum):
+    DIAGNOSTIC = "diagnostic"
+    SIMULATION_CANDIDATE = "simulation_candidate"
+
+
+class ReportAuthor(StrEnum):
+    MODEL = "model"
+    APPLICATION = "application"
+
+
+class StopReason(StrEnum):
+    """Why the runner returned no candidate (E5). Values match `TerminationReason`."""
+
+    MODEL_REFUSED = "model_refused"
+    PROVIDER_FAILURE = "provider_failure"
+    TURN_LIMIT_REACHED = "turn_limit_reached"
+    BUDGET_EXHAUSTED = "budget_exhausted"
+
+
 class ValidationStageStatus(StrEnum):
     PASSED = "passed"
     FAILED = "failed"
