@@ -32,7 +32,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | T1.2 | Investigation and attempt state machines | done | [T1.2](tasks/T1.2.md) |
 | T1.3 | Model-call and tool reservation ledger transitions | done | [T1.3](tasks/T1.3.md) |
 | T1.4 | Evidence and selector models | done | [T1.4](tasks/T1.4.md) |
-| T1.5 | `ReportCandidate`, `DiagnosisReport`, `Measurement` | todo | |
+| T1.5 | `ReportCandidate`, `DiagnosisReport`, `Measurement` | done | [T1.5](tasks/T1.5.md) |
 | T1.6 | SDK schema spike (gate: provider and API key) | todo | |
 | T1.7 | Cross-record validators and citation checker | todo | |
 | T1.8 | Tool envelope and error codes | todo | |
