@@ -1,7 +1,7 @@
 """Evidence rows and the selectors that cite them: errata E3, E15 and E19.
 
 A selector is the only way to point at evidence. It carries no owner or snapshot,
-because the model never sees either: both come from the investigation.
+because the model never writes either: both come from the investigation.
 """
 
 from typing import Annotated, Literal, Self

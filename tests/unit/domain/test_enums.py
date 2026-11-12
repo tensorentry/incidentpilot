@@ -23,6 +23,9 @@ from incidentpilot.domain.enums import (
     StopReason,
     TerminationReason,
     ToolCallState,
+    ToolErrorCode,
+    ToolName,
+    ToolStatus,
     ValidationStageStatus,
 )
 
@@ -225,7 +228,8 @@ def test_validation_stage_values_are_pinned() -> None:
 
 
 @pytest.mark.parametrize(
-    "enum", [InvestigationStatus, AttemptStatus, ModelCallState, EventType, FailureCategory]
+    "enum",
+    [InvestigationStatus, AttemptStatus, ModelCallState, EventType, FailureCategory, ToolErrorCode],
 )
 def test_upper_case_members_store_their_own_name(enum: type[StrEnum]) -> None:
     assert all(member.name == member.value for member in enum)
@@ -233,7 +237,7 @@ def test_upper_case_members_store_their_own_name(enum: type[StrEnum]) -> None:
 
 @pytest.mark.parametrize(
     "enum",
-    [InvestigationStatus, AttemptStatus, ModelCallState, EventType, FailureCategory],
+    [InvestigationStatus, AttemptStatus, ModelCallState, EventType, FailureCategory, ToolErrorCode],
 )
 def test_stored_values_are_upper_snake_case(enum: type[StrEnum]) -> None:
     assert all(re.fullmatch(r"[A-Z][A-Z_]*", value) for value in values(enum))
@@ -255,6 +259,8 @@ def test_stored_values_are_upper_snake_case(enum: type[StrEnum]) -> None:
         RecommendationKind,
         ReportAuthor,
         StopReason,
+        ToolName,
+        ToolStatus,
     ],
 )
 def test_reported_values_are_lower_snake_case(enum: type[StrEnum]) -> None:
