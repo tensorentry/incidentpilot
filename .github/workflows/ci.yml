@@ -35,3 +35,50 @@ jobs:
           unshare --net --setuid "$(id -u)" --setgid "$(id -g)"
           env "PATH=$PATH" "HOME=$HOME" CI_EXPECT_NO_NETWORK=1
           make check
+
+  integration:
+    # Real PostgreSQL from the project's own Compose files (spec §17.1). This job needs
+    # the network to pull the image, so it runs apart from the offline check.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.7"
+          enable-cache: false
+
+      - name: Generate throwaway database passwords
+        run: |
+          for name in SUPERUSER MIGRATOR RUNTIME; do
+            password="$(openssl rand -hex 24)"
+            echo "::add-mask::$password"
+            echo "DB_${name}_PASSWORD=$password" >> "$GITHUB_ENV"
+          done
+
+      - name: Point the application at the local database
+        run: |
+          base="@127.0.0.1:55432/incidentpilot"
+          {
+            echo "INCIDENTPILOT_DATABASE_URL=postgresql://incidentpilot_runtime:${DB_RUNTIME_PASSWORD}${base}"
+            echo "INCIDENTPILOT_MIGRATION_DATABASE_URL=postgresql://incidentpilot_migrator:${DB_MIGRATOR_PASSWORD}${base}"
+          } >> "$GITHUB_ENV"
+
+      - name: Install locked toolchain
+        run: make sync
+
+      - name: Start PostgreSQL
+        run: make infra-up
+
+      - name: Apply migrations to the real database
+        run: make migrate
+
+      - name: Run integration tests
+        run: make test-integration
+
+      - name: Show database logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml logs postgres

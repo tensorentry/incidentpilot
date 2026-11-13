@@ -7,6 +7,8 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic>=1.20.1",
+    "psycopg[binary]>=3.3.9",
     "pydantic>=2.14.3",
     "pydantic-settings>=2.16.2",
     "python-dotenv>=1.2.4",
@@ -17,6 +19,7 @@ dev = [
     "mutmut>=3.8.1",
     "mypy>=2.4.1",
     "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
     "ruff>=0.17.4",
 ]
 
@@ -38,6 +41,9 @@ force-exclude = true
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4", "PT", "RUF", "S", "DTZ"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["incidentpilot", "tests"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
 "scripts/**" = ["S603", "S607"]
@@ -47,15 +53,26 @@ strict = true
 plugins = ["pydantic.mypy"]
 python_version = "3.12"
 files = ["src", "tests", "scripts"]
+# Test modules import shared helpers as tests.<path>, so name modules from their path.
+explicit_package_bases = true
+mypy_path = ["src"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+# Lets test modules import shared helpers as tests.<path>.
+pythonpath = ["."]
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 xfail_strict = true
 filterwarnings = ["error"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
 
 [tool.mutmut]
 source_paths = ["src/incidentpilot/"]
 pytest_add_cli_args_test_selection = ["tests/"]
+# Mutating SQL text only produces syntax errors. Integration tests check what the
+# migrations do instead.
+do_not_mutate = ["src/incidentpilot/persistence/migrations/*"]
 also_copy = ["docs", "scenarios", "MANIFEST.json", ".env.example", "README.md", "LICENSE"]
