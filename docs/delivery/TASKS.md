@@ -43,7 +43,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 |---|---|---|---|
 | T2.1 | Fixture schema, snapshot manifest, oracle import contract | done | [T2.1](tasks/T2.1.md) |
 | T2.2 | Seeded generator and first case | done | [T2.2](tasks/T2.2.md) |
-| T2.3 | Second and third contrasting cases | todo | |
+| T2.3 | Second and third contrasting cases | done | [T2.3](tasks/T2.3.md) |
 | T2.4 | Non-leakage test | todo | |
 
 ## M3 — Durable slice (IP3-004), needs Docker running

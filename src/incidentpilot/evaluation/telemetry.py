@@ -25,6 +25,13 @@ LATENCY_BOUNDS_MS = (25, 50, 100, 200, 400, 800, 1600, 3200)
 LATENCY_SPREAD = 0.35
 
 Curve = Callable[[datetime], float]
+Presence = Callable[[datetime], bool]
+
+
+def always(t: datetime) -> bool:
+    """Telemetry present at every minute."""
+    del t
+    return True
 
 
 def grid(window: TimeWindow, step: timedelta = RESOLUTION) -> list[datetime]:
@@ -40,10 +47,14 @@ def counts(
     service: str,
     metric: str,
     dependency: str | None = None,
+    present: Presence = always,
 ) -> ScalarSeries:
-    """A counter whose per-minute values scatter around `rate_per_minute`."""
+    """A counter whose per-minute values scatter around `rate_per_minute`.
+
+    Minutes where `present` is false have no point: a gap, not a zero.
+    """
     points = []
-    for t in grid(window):
+    for t in filter(present, grid(window)):
         expected = rate_per_minute(t)
         value = max(0, round(rng.gauss(expected, math.sqrt(expected))))
         points.append(ScalarPoint(t=t, v=value))
@@ -67,10 +78,11 @@ def latencies(
     *,
     service: str,
     dependency: str | None = None,
+    present: Presence = always,
 ) -> HistogramSeries:
-    """A latency histogram of log-normal draws around `median_ms`."""
+    """A latency histogram of log-normal draws around `median_ms`, with gaps like `counts`."""
     points = []
-    for t in grid(window):
+    for t in filter(present, grid(window)):
         tally = [0] * (len(LATENCY_BOUNDS_MS) + 1)
         mu = math.log(median_ms(t))
         for _ in range(round(samples_per_minute(t))):
