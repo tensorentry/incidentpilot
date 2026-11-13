@@ -1,0 +1,10 @@
+# Development only (erratum E10): publishes PostgreSQL on loopback so host tests and
+# the CLI can reach it. Never use this file outside a developer machine.
+services:
+  postgres:
+    ports:
+      - 127.0.0.1:${DB_HOST_PORT:-55432}:5432
+    networks: [private, host-access]
+
+networks:
+  host-access: {}
