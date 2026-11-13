@@ -33,10 +33,14 @@ class Settings(BaseSettings):
     mode: RunMode = RunMode.OFFLINE_DEMO
     provider_api_key: SecretStr | None = None
     trace_export_enabled: bool = False
+    # Connection strings hold passwords, so they're secrets too. Runtime and migration
+    # use different roles (ADR-014).
+    database_url: SecretStr | None = None
+    migration_database_url: SecretStr | None = None
 
-    @field_validator("provider_api_key")
+    @field_validator("provider_api_key", "database_url", "migration_database_url")
     @classmethod
-    def _blank_key_is_missing(cls, value: SecretStr | None) -> SecretStr | None:
+    def _blank_secret_is_missing(cls, value: SecretStr | None) -> SecretStr | None:
         stripped = "" if value is None else value.get_secret_value().strip()
         return SecretStr(stripped) if stripped else None
 

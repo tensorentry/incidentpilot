@@ -251,6 +251,24 @@ def test_default_env_file_is_optional(tmp_path: Path, monkeypatch: pytest.Monkey
     assert load_settings().mode is RunMode.OFFLINE_DEMO
 
 
+@pytest.mark.parametrize("setting", ["DATABASE_URL", "MIGRATION_DATABASE_URL"])
+def test_blank_database_url_counts_as_missing(
+    monkeypatch: pytest.MonkeyPatch, setting: str
+) -> None:
+    monkeypatch.setenv(f"INCIDENTPILOT_{setting}", "  ")
+
+    assert getattr(load_settings(env_file=None), setting.lower()) is None
+
+
+@pytest.mark.parametrize("setting", ["DATABASE_URL", "MIGRATION_DATABASE_URL"])
+def test_database_url_is_hidden_from_repr(monkeypatch: pytest.MonkeyPatch, setting: str) -> None:
+    monkeypatch.setenv(f"INCIDENTPILOT_{setting}", f"postgresql://role:{CANARY}@localhost/db")
+    settings = load_settings(env_file=None)
+
+    assert CANARY not in repr(settings)
+    assert getattr(settings, setting.lower()).get_secret_value().endswith("@localhost/db")
+
+
 def test_key_is_stripped(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INCIDENTPILOT_PROVIDER_API_KEY", f"  {CANARY}\n")
 

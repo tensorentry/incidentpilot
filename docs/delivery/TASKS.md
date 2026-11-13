@@ -8,7 +8,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 
 **How work lands on `main`:** each task goes through a pull request, and merges only when CI is green. Branch protection enforces this, so direct pushes to `main` are rejected, including from the owner.
 
-**Before opening a pull request:** `make check` and `make mutate` must both pass. Coverage isn't enough: at R1 it was 100% while real defects went unnoticed.
+**Before opening a pull request:** `make check`, `make test-integration` and `make mutate` must all pass. The last two need PostgreSQL running (`make infra-up`). Coverage isn't enough: at R1 it was 100% while real defects went unnoticed.
 
 **Reviews:** [R1, staff review of T0.1 to T1.2](reviews/R1.md)
 
@@ -50,7 +50,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 
 | Task | Work | Status | Record |
 |---|---|---|---|
-| T3.1 | Compose Postgres, Alembic, owner and runtime roles, row-level security helper, two-owner test harness | todo | |
+| T3.1 | Compose Postgres, Alembic, owner and runtime roles, row-level security helper, two-owner test harness | done | [T3.1](tasks/T3.1.md) |
 | T3.2 | Snapshot table and import step | todo | |
 | T3.3 | Minimal sanitizer | todo | |
 | T3.4 | Create-incident service with idempotency | todo | |
