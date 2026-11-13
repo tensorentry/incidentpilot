@@ -56,6 +56,7 @@ LogLine = tuple[datetime, str, LogSeverity, str]
 
 @dataclass(frozen=True, slots=True)
 class GeneratedCase:
+    family: str
     bundle: ObservationBundle
     oracle: Oracle
 
@@ -259,7 +260,8 @@ def synchronous_dependency(seed: int) -> GeneratedCase:
     call volume discriminate; the deploy's timing alone does not prove the cause.
     """
     rng = Random(seed)  # noqa: S311 - reproducible synthetic data, never a secret
-    snapshot_id = snapshot_id_for("synchronous-dependency", seed)
+    family = "synchronous-dependency"
+    snapshot_id = snapshot_id_for(family, seed)
     deployed_at = START + timedelta(minutes=70)
     decoy_at = START + timedelta(minutes=40)
     metrics = standard_metrics(
@@ -295,6 +297,7 @@ def synchronous_dependency(seed: int) -> GeneratedCase:
         checkout_spans(rng, "span-0002", INCIDENT, (150, 320), (65, 130)),
     ]
     return GeneratedCase(
+        family=family,
         bundle=bundle(snapshot_id, metrics, logs, deployments, spans),
         oracle=oracle(
             snapshot_id,
@@ -317,7 +320,8 @@ def dependency_degradation(seed: int) -> GeneratedCase:
     inventory is untouched. Checkout's call volume to each dependency doesn't change.
     """
     rng = Random(seed)  # noqa: S311 - reproducible synthetic data, never a secret
-    snapshot_id = snapshot_id_for("dependency-degradation", seed)
+    family = "dependency-degradation"
+    snapshot_id = snapshot_id_for(family, seed)
     decoy_at = START + timedelta(minutes=68)
     degraded_at = START + timedelta(minutes=72)
     metrics = standard_metrics(
@@ -350,6 +354,7 @@ def dependency_degradation(seed: int) -> GeneratedCase:
         checkout_spans(rng, "span-0002", INCIDENT, (14, 30), (260, 560)),
     ]
     return GeneratedCase(
+        family=family,
         bundle=bundle(snapshot_id, metrics, logs, deployments, spans),
         oracle=oracle(
             snapshot_id,
@@ -374,7 +379,8 @@ def missing_dependency_telemetry(seed: int) -> GeneratedCase:
     The right answer is to abstain, or report partially with the missing tests named.
     """
     rng = Random(seed)  # noqa: S311 - reproducible synthetic data, never a secret
-    snapshot_id = snapshot_id_for("missing-dependency-telemetry", seed)
+    family = "missing-dependency-telemetry"
+    snapshot_id = snapshot_id_for(family, seed)
     deployed_at = START + timedelta(minutes=68)
     slowed_at = START + timedelta(minutes=70)
     lost_at = START + timedelta(minutes=65)
@@ -402,6 +408,7 @@ def missing_dependency_telemetry(seed: int) -> GeneratedCase:
     ]
     spans = [checkout_spans(rng, "span-0001", BASELINE, (14, 30), (65, 130))]
     return GeneratedCase(
+        family=family,
         bundle=bundle(snapshot_id, metrics, logs, deployments, spans),
         oracle=oracle(
             snapshot_id,
