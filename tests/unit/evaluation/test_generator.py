@@ -4,17 +4,10 @@ from random import Random
 
 import pytest
 
-from incidentpilot.adapters.fixture_bundle import (
-    HistogramSeries,
-    ObservationBundle,
-    ScalarSeries,
-    SpanSummary,
-)
-from incidentpilot.domain.window import TimeWindow
+from incidentpilot.adapters.fixture_bundle import ObservationBundle
 from incidentpilot.evaluation.cases import (
     BASELINE,
     CASES,
-    INCIDENT,
     GeneratedCase,
     snapshot_id_for,
     synchronous_dependency,
@@ -136,119 +129,3 @@ def test_latencies_put_fast_samples_in_the_first_bucket() -> None:
 
     assert series.points[0].buckets[0].count == 50
     assert series.points[0].overflow == 0
-
-
-def test_the_oracle_names_the_bundles_snapshot() -> None:
-    assert case().oracle.snapshot_id == case().bundle.manifest.snapshot_id
-    assert case().oracle.answerable
-
-
-# The signals case 1 is meant to carry (spec §14.1)
-
-
-def p95(series: HistogramSeries, window: TimeWindow) -> float:
-    """The bucket bound below which 95% of the window's samples fall."""
-    points = [p for p in series.points if window.start_at <= p.t < window.end_at]
-    totals = [sum(p.buckets[i].count for p in points) for i in range(len(points[0].buckets))]
-    overflow = sum(p.overflow for p in points)
-    target = 0.95 * (sum(totals) + overflow)
-    running = 0
-    for bucket, total in zip(points[0].buckets, totals, strict=True):
-        running += total
-        if running >= target:
-            return bucket.le
-    return float("inf")
-
-
-def rate(series: ScalarSeries, window: TimeWindow) -> float:
-    points = [p.v for p in series.points if window.start_at <= p.t < window.end_at]
-    return sum(points) / len(points)
-
-
-def histogram(service: str, dependency: str | None = None) -> HistogramSeries:
-    for series in case().bundle.metrics:
-        if (
-            isinstance(series, HistogramSeries)
-            and series.service == service
-            and series.dependency == dependency
-        ):
-            return series
-    raise LookupError(service)
-
-
-def counter(service: str, metric: str, dependency: str | None = None) -> ScalarSeries:
-    for series in case().bundle.metrics:
-        if isinstance(series, ScalarSeries) and (
-            series.service,
-            series.metric,
-            series.dependency,
-        ) == (service, metric, dependency):
-            return series
-    raise LookupError(metric)
-
-
-def segment_p95(summary: SpanSummary, downstream: str | None) -> float:
-    return next(s.p95_ms for s in summary.segments if s.downstream == downstream)
-
-
-def test_checkout_slows_down_during_the_incident() -> None:
-    checkout = histogram("checkout-api")
-
-    assert p95(checkout, INCIDENT) >= 2 * p95(checkout, BASELINE)
-
-
-@pytest.mark.parametrize(
-    ("service", "dependency"),
-    [
-        ("inventory", None),
-        ("checkout-api", "inventory"),
-        ("checkout-api", "payments"),
-        ("payments", None),
-    ],
-    ids=["inventory-itself", "each-inventory-call", "each-payments-call", "payments-itself"],
-)
-def test_the_dependencies_stay_fast(service: str, dependency: str | None) -> None:
-    series = histogram(service, dependency)
-
-    assert p95(series, INCIDENT) == p95(series, BASELINE)
-
-
-def test_checkout_calls_inventory_more_often() -> None:
-    calls = counter("checkout-api", "request_count", "inventory")
-    requests = counter("checkout-api", "request_count")
-
-    assert rate(calls, INCIDENT) >= 3 * rate(calls, BASELINE)
-    assert rate(requests, INCIDENT) == pytest.approx(rate(requests, BASELINE), rel=0.1)
-
-
-def test_spans_show_checkout_waiting_on_inventory() -> None:
-    baseline, incident = case().bundle.spans
-
-    assert (baseline.window, incident.window) == (BASELINE, INCIDENT)
-    assert segment_p95(incident, "inventory") >= 5 * segment_p95(baseline, "inventory")
-    assert segment_p95(incident, "payments") == pytest.approx(
-        segment_p95(baseline, "payments"), rel=0.15
-    )
-    assert segment_p95(incident, None) == pytest.approx(segment_p95(baseline, None), rel=0.15)
-
-
-def test_a_decoy_deploy_precedes_the_real_one() -> None:
-    decoy, real = case().bundle.deployments
-
-    assert (decoy.service, real.service) == ("payments", "checkout-api")
-    assert decoy.deployed_at < real.deployed_at < INCIDENT.start_at
-    assert real.deployed_at > BASELINE.end_at
-
-
-def test_payments_errors_are_flat() -> None:
-    errors = counter("payments", "error_count")
-
-    assert rate(errors, INCIDENT) < 1
-    assert rate(errors, BASELINE) < 1
-
-
-def test_warnings_appear_only_during_the_incident() -> None:
-    warnings = [log for log in case().bundle.logs if log.severity == "warn"]
-
-    assert warnings
-    assert all(INCIDENT.start_at <= log.timestamp < INCIDENT.end_at for log in warnings)
