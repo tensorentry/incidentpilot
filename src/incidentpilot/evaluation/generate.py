@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from incidentpilot.domain.canonical import canonical_json
 from incidentpilot.evaluation.cases import CASES, GeneratedCase
+from incidentpilot.evaluation.leakage import LeakError, forbidden_terms, leaks
 
 
 def encode(model: BaseModel) -> bytes:
@@ -19,7 +20,11 @@ def encode(model: BaseModel) -> bytes:
 
 
 def write_case(case: GeneratedCase, root: Path) -> None:
+    """Write both files, or neither if the bundle would leak its answer."""
     name = f"{case.bundle.manifest.snapshot_id}.json"
+    found = leaks(encode(case.bundle).decode(), forbidden_terms(case.family, case.oracle))
+    if found:
+        raise LeakError(f"{name} would show the investigator: {', '.join(found)}")
     for folder, model in (("observations", case.bundle), ("oracle", case.oracle)):
         (root / folder).mkdir(parents=True, exist_ok=True)
         (root / folder / name).write_bytes(encode(model))
