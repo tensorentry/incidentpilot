@@ -10,6 +10,8 @@ from incidentpilot.persistence import migrate
 from incidentpilot.persistence.isolation import LOCAL_OWNER_ID
 from tests.integration.harness import ScratchDatabase
 
+HEAD = "0002"
+
 
 async def contents(database: ScratchDatabase) -> tuple[object, object]:
     async with database.migrator() as connection:
@@ -25,14 +27,14 @@ async def test_migrating_an_empty_database_seeds_only_the_local_owner(
 ) -> None:
     migrate.upgrade(empty_database.conninfo("migrator"))
 
-    assert await contents(empty_database) == ([("0001",)], [(LOCAL_OWNER_ID, "local")])
+    assert await contents(empty_database) == ([(HEAD,)], [(LOCAL_OWNER_ID, "local")])
 
 
 async def test_migrating_again_changes_nothing(empty_database: ScratchDatabase) -> None:
     migrate.upgrade(empty_database.conninfo("migrator"))
     migrate.upgrade(empty_database.conninfo("migrator"))
 
-    assert await contents(empty_database) == ([("0001",)], [(LOCAL_OWNER_ID, "local")])
+    assert await contents(empty_database) == ([(HEAD,)], [(LOCAL_OWNER_ID, "local")])
 
 
 def test_migrations_refuse_to_go_back(database: ScratchDatabase) -> None:
@@ -51,4 +53,4 @@ async def test_the_entry_point_migrates_the_configured_database(
 
     migrate.main()
 
-    assert await contents(empty_database) == ([("0001",)], [(LOCAL_OWNER_ID, "local")])
+    assert await contents(empty_database) == ([(HEAD,)], [(LOCAL_OWNER_ID, "local")])

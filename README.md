@@ -2,7 +2,7 @@
 
 A local-first lab for evidence-linked investigation of simulated service incidents, using one bounded AI investigator. It's a learning and engineering showcase, not a production incident tool.
 
-**Status:** early implementation. The toolchain, settings and core domain types exist. PostgreSQL, its roles and the first migration exist. There's no worker or agent yet, and no benchmark has been run. See [`docs/delivery/TASKS.md`](docs/delivery/TASKS.md).
+**Status:** early implementation. The toolchain, settings and core domain types exist. PostgreSQL, its roles and the snapshot registry exist. There's no worker or agent yet, and no benchmark has been run. See [`docs/delivery/TASKS.md`](docs/delivery/TASKS.md).
 
 ## Design documents
 
@@ -39,6 +39,7 @@ State lives in PostgreSQL, run with Docker Compose. Fill in the database setting
 ```bash
 make infra-up          # start PostgreSQL, published on 127.0.0.1 only
 make migrate           # apply migrations as the migrator role
+make import-snapshots  # register scenarios/observations as snapshots for the local owner
 make test-integration  # integration tests against the real database
 make infra-down        # stop it; the data volume is kept
 ```

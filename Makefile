@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := check
 .PHONY: sync lock-check format lint types test check mutate fixtures \
-	infra-up infra-down migrate test-integration
+	infra-up infra-down migrate import-snapshots test-integration
 
 UV_RUN := uv run --frozen
 COMPOSE := docker compose -f docker-compose.yml -f docker-compose.dev.yml
@@ -42,6 +42,10 @@ infra-down:
 
 migrate:
 	$(UV_RUN) python -m incidentpilot.persistence.migrate
+
+# Imports scenarios/observations for the local owner; pass ARGS="--owner <uuid>" for another.
+import-snapshots:
+	$(UV_RUN) python -m incidentpilot.application.snapshots $(ARGS)
 
 test-integration:
 	$(UV_RUN) pytest tests/integration
