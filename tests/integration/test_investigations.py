@@ -25,12 +25,11 @@ from incidentpilot.persistence.investigations import (
     get_investigation,
     insert_investigation,
 )
-from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase
+from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase, still_blocked
 from tests.integration.seeding import MANIFEST, incident_request, seed, start_request
 
 OFFLINE = RunMode.OFFLINE_DEMO
 KEY = "start-1"
-BLOCKED = 0.3
 
 
 def exactly(message: str) -> str:
@@ -239,8 +238,7 @@ async def test_admission_waits_for_a_concurrent_start_and_counts_it(
                     second, OWNER_A, OFFLINE, seeded.incident_id, KEY, start_request()
                 )
             )
-            await asyncio.sleep(BLOCKED)
-            assert not late.done()
+            assert await still_blocked(late)
 
         with pytest.raises(Rejected):
             await late

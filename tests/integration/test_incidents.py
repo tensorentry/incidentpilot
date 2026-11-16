@@ -22,12 +22,10 @@ from incidentpilot.domain.incident import CreateIncident
 from incidentpilot.persistence import idempotency
 from incidentpilot.persistence.database import Connection, owner_transaction
 from incidentpilot.persistence.incidents import get_incident, insert_incident
-from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase
+from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase, still_blocked
 
 START = datetime(2026, 11, 4, 18, 0, tzinfo=UTC)
 KEY = "9adc6bbf-3a4c-4624-8c50-a11938dbdf55"
-# Long enough that a transaction still waiting on a lock is clearly blocked.
-BLOCKED = 0.3
 
 
 def incident(description: str = "Checkout latency is up since the 18:05 deploy") -> CreateIncident:
@@ -141,8 +139,7 @@ async def test_a_concurrent_retry_waits_and_returns_the_first_incident(
         async with owner_transaction(first, OWNER_A):
             held = await hold_key(first, incident())
             retry = asyncio.create_task(create_incident(second, OWNER_A, KEY, incident()))
-            await asyncio.sleep(BLOCKED)
-            assert not retry.done()
+            assert await still_blocked(retry)
 
         result = await retry
         assert (result.incident.id, result.created) == (held, False)
@@ -156,8 +153,7 @@ async def test_a_concurrent_different_request_conflicts_once_the_first_commits(
         async with owner_transaction(first, OWNER_A):
             await hold_key(first, incident())
             other = asyncio.create_task(create_incident(second, OWNER_A, KEY, incident("Other")))
-            await asyncio.sleep(BLOCKED)
-            assert not other.done()
+            assert await still_blocked(other)
 
         with pytest.raises(IdempotencyConflict):
             await other
@@ -174,8 +170,7 @@ async def hold_then_roll_back(
         async with owner_transaction(first, OWNER_A):
             held = await hold_key(first, incident())
             waiting = asyncio.create_task(create_incident(second, OWNER_A, KEY, incident()))
-            await asyncio.sleep(BLOCKED)
-            assert not waiting.done()
+            assert await still_blocked(waiting)
             raise RolledBack
     except RolledBack:
         return held, waiting
