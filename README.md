@@ -48,14 +48,15 @@ The passwords in `.env` are set once, when the data volume is first created. To 
 
 `make mutate` also runs the integration tests, so it needs the database running and configured too.
 
-Two roles connect ([ADR-014](docs/adr/ADR-014-owner-isolation-in-postgres.md)):
+Two roles connect, and a third owns the few functions that must see every owner ([ADR-014](docs/adr/ADR-014-owner-isolation-in-postgres.md)):
 
 | Role | Used by | Can |
 |---|---|---|
 | `incidentpilot_migrator` | `make migrate` | Own the schema and change it |
 | `incidentpilot_runtime` | API, workers, CLI | Use only what migrations grant; owns nothing and can't bypass row security |
+| `incidentpilot_scheduler` | Nobody: it can't log in | Own the scheduler's `SECURITY DEFINER` functions, which return only IDs and counts (erratum E19) |
 
-The app refuses to start its runtime connection with a role that could bypass row security.
+The app refuses to start its runtime connection with a role that could bypass row security, including a member of one that can.
 
 ## Configuration
 

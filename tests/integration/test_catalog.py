@@ -4,6 +4,11 @@ Only the owners table and Alembic's own table are exempt. T3.14 widens this into
 full catalog check: keys, foreign keys, roles and definer functions.
 """
 
+import re
+
+import pytest
+
+from incidentpilot.domain.enums import EventType, IncidentSeverity, InvestigationStatus, RunMode
 from tests.integration.harness import ScratchDatabase
 
 EXEMPT = {"alembic_version", "owners"}
@@ -55,3 +60,27 @@ async def test_every_unique_key_on_a_tenant_table_includes_the_owner(
     tenant_keys = [(index, owned) for table, index, owned in keys if table not in EXEMPT]
     assert tenant_keys
     assert all(owned for _, owned in tenant_keys), tenant_keys
+
+
+@pytest.mark.parametrize(
+    ("table", "column", "values"),
+    [
+        ("incidents", "severity", {s.value for s in IncidentSeverity}),
+        ("investigations", "status", {s.value for s in InvestigationStatus}),
+        ("investigations", "mode", {m.value for m in RunMode} - {RunMode.REPLAY.value}),
+        ("run_events", "event_type", {e.value for e in EventType}),
+    ],
+)
+async def test_each_stored_vocabulary_matches_its_enum(
+    database: ScratchDatabase, table: str, column: str, values: set[str]
+) -> None:
+    async with database.migrator() as connection:
+        cursor = await connection.execute(
+            "SELECT pg_catalog.pg_get_constraintdef(oid) FROM pg_catalog.pg_constraint"
+            " WHERE conrelid = %s::regclass AND contype = 'c'"
+            " AND pg_catalog.pg_get_constraintdef(oid) LIKE %s",
+            (table, f"%({column} = ANY%"),
+        )
+        (definition,) = await cursor.fetchone() or ("",)
+
+    assert set(re.findall(r"'([^']*)'::text", str(definition))) == values

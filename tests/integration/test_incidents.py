@@ -10,10 +10,10 @@ from uuid import uuid4
 import pytest
 from psycopg import errors
 
+from incidentpilot.application.errors import IdempotencyConflict
 from incidentpilot.application.incidents import (
     OPERATION,
     CreatedIncident,
-    IdempotencyConflict,
     create_incident,
     fingerprint,
 )

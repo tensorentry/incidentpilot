@@ -8,7 +8,8 @@ from uuid import UUID
 
 import pytest
 
-from incidentpilot.application.incidents import IncidentError, create_incident, fingerprint
+from incidentpilot.application.errors import RequestError
+from incidentpilot.application.incidents import create_incident, fingerprint
 from incidentpilot.domain.ids import OwnerId
 from incidentpilot.domain.incident import CreateIncident
 from incidentpilot.persistence.database import Connection
@@ -54,11 +55,11 @@ def test_a_different_request_or_owner_changes_the_fingerprint() -> None:
 @pytest.mark.parametrize("key", ["", "x" * 129, "has space", "café", "tab\tkey"])
 async def test_a_malformed_key_is_refused(key: str) -> None:
     message = "an idempotency key is 1 to 128 printable ASCII characters"
-    with pytest.raises(IncidentError, match=exactly(message)):
+    with pytest.raises(RequestError, match=exactly(message)):
         await create_incident(NO_DATABASE, OWNER, key, incident())
 
 
 @pytest.mark.parametrize("description", ["​‮", "\x00\x01", "  \n\t "])
 async def test_a_description_with_nothing_visible_is_refused(description: str) -> None:
-    with pytest.raises(IncidentError, match=exactly("the description has no visible text")):
+    with pytest.raises(RequestError, match=exactly("the description has no visible text")):
         await create_incident(NO_DATABASE, OWNER, "key-1", incident(description))

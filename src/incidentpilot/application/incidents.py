@@ -8,23 +8,16 @@ transaction, so neither exists without the other.
 from dataclasses import dataclass
 from uuid import uuid4
 
+from incidentpilot.application.errors import RequestError
+from incidentpilot.application.idempotent import check_key, claim_or_replay
 from incidentpilot.domain.canonical import sha256_digest
 from incidentpilot.domain.ids import IncidentId, OwnerId
 from incidentpilot.domain.incident import MAX_DESCRIPTION, CreateIncident, IncidentRecord
-from incidentpilot.persistence import idempotency
 from incidentpilot.persistence.database import Connection, owner_transaction
 from incidentpilot.persistence.incidents import get_incident, insert_incident
 from incidentpilot.policies.redaction import SANITIZER_VERSION, sanitize
 
 OPERATION = "create_incident"
-
-
-class IncidentError(Exception):
-    """The request can't create an incident."""
-
-
-class IdempotencyConflict(IncidentError):
-    """The key was already used for a different request."""
 
 
 @dataclass(frozen=True)
@@ -43,23 +36,20 @@ def fingerprint(owner_id: OwnerId, request: CreateIncident) -> str:
 async def create_incident(
     connection: Connection, owner_id: OwnerId, key: str, request: CreateIncident
 ) -> CreatedIncident:
-    if not idempotency.KEY.fullmatch(key):
-        raise IncidentError("an idempotency key is 1 to 128 printable ASCII characters")
+    check_key(key)
     description = sanitize(request.description, limit=MAX_DESCRIPTION).text
     if not description.strip():
-        raise IncidentError("the description has no visible text")
+        raise RequestError("the description has no visible text")
     request_sha256 = fingerprint(owner_id, request)
     incident_id = IncidentId(uuid4())
     async with owner_transaction(connection, owner_id):
-        if await idempotency.claim(connection, OPERATION, key, request_sha256, incident_id):
+        earlier = await claim_or_replay(connection, OPERATION, key, request_sha256, incident_id)
+        if earlier is None:
             incident = await insert_incident(
                 connection, incident_id, request, description, SANITIZER_VERSION
             )
             return CreatedIncident(incident, created=True)
-        earlier = await idempotency.recorded(connection, OPERATION, key)
-        if earlier is None or earlier.request_sha256 != request_sha256:
-            raise IdempotencyConflict(f"idempotency key {key!r} was used for a different request")
-        original = await get_incident(connection, IncidentId(earlier.resource_id))
+        original = await get_incident(connection, IncidentId(earlier))
         # Neither table allows DELETE, and both rows commit together.
         assert original is not None  # noqa: S101
         return CreatedIncident(original, created=False)

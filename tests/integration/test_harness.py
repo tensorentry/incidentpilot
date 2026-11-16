@@ -1,5 +1,7 @@
 """The harness gives each test its own migrated database with two owners."""
 
+from uuid import uuid4
+
 from psycopg import sql
 
 from tests.integration.harness import (
@@ -31,8 +33,9 @@ async def test_the_two_owners_are_distinct_and_the_first_is_local(
 def test_a_sweep_drops_only_copies_whose_run_is_gone(
     database: ScratchDatabase, servers: Servers
 ) -> None:
-    # No server process has PID 0, and a name without a PID predates this scheme.
-    stale = ["incidentpilot_test_0_" + "0" * 32, "incidentpilot_test_unnamed"]
+    # No server process has PID 0, and a name without a PID predates this scheme. Names
+    # are unique, because other test runs may be sweeping at the same time.
+    stale = [f"incidentpilot_test_0_{uuid4().hex}", f"incidentpilot_test_unnamed_{uuid4().hex}"]
     with admin(servers) as connection:
         for name in stale:
             connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
@@ -45,6 +48,7 @@ def test_a_sweep_drops_only_copies_whose_run_is_gone(
             )
         }
 
-    assert set(stale) <= set(dropped)
-    assert {database.name, TEMPLATE, "incidentpilot"} <= remaining
+    # Another run's sweep may have dropped them first, so check what's left.
     assert not set(stale) & remaining
+    assert {database.name, TEMPLATE, "incidentpilot"} <= remaining
+    assert not set(dropped) & {database.name, TEMPLATE, "incidentpilot"}

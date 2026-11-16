@@ -11,6 +11,7 @@ from incidentpilot.domain.ids import OwnerId
 
 RUNTIME_ROLE = "incidentpilot_runtime"
 MIGRATOR_ROLE = "incidentpilot_migrator"
+SCHEDULER_ROLE = "incidentpilot_scheduler"
 OWNER_SETTING = "app.owner_id"
 OWNER_POLICY = "owner_isolation"
 # Seeded by the first migration (erratum E10) until real authentication arrives.
