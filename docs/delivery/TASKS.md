@@ -55,7 +55,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | T3.3 | Minimal sanitizer | done | [T3.3](tasks/T3.3.md) |
 | T3.4 | Create-incident service with idempotency | done | [T3.4](tasks/T3.4.md) |
 | T3.5 | Start-investigation, event append, admission lock | done | [T3.5](tasks/T3.5.md) |
-| T3.6 | Fence primitive | todo | |
+| T3.6 | Fence primitive | done | [T3.6](tasks/T3.6.md) |
 | T3.7 | CLI over application services | todo | |
 | T3.8 | Attempts, capacity slots, claim transaction | todo | |
 | T3.9 | Worker loop and lease renewal | todo | |

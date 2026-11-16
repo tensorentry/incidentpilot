@@ -1,5 +1,6 @@
 """Real PostgreSQL for integration tests (spec §17.1), with two owners (erratum E19)."""
 
+import asyncio
 import hashlib
 import re
 import time
@@ -29,6 +30,16 @@ TEMPLATE_LOCK = 4_212_031
 # whose process is gone was left behind by a run that was killed.
 DROP_ATTEMPTS = 50
 COPY_NAME = re.compile(r"incidentpilot_test_(\d+)_[0-9a-f]{32}")
+
+
+# Long enough that a transaction still waiting on a lock is clearly blocked.
+BLOCKED_SECONDS = 0.3
+
+
+async def still_blocked(task: asyncio.Task[object]) -> bool:
+    """Whether a task waiting on another transaction's lock is still waiting."""
+    await asyncio.sleep(BLOCKED_SECONDS)
+    return not task.done()
 
 
 @dataclass(frozen=True)
