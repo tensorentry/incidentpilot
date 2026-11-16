@@ -2,6 +2,7 @@
 
 import hashlib
 import re
+import time
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -10,7 +11,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 import psycopg
-from psycopg import sql
+from psycopg import errors, sql
 from psycopg.conninfo import make_conninfo
 
 from incidentpilot.domain.ids import OwnerId
@@ -26,6 +27,7 @@ PERSISTENCE = Path(migrate.__file__).parent
 TEMPLATE_LOCK = 4_212_031
 # A copy is named for the server process of its test run's admin connection, so a copy
 # whose process is gone was left behind by a run that was killed.
+DROP_ATTEMPTS = 50
 COPY_NAME = re.compile(r"incidentpilot_test_(\d+)_[0-9a-f]{32}")
 
 
@@ -62,7 +64,10 @@ class ScratchDatabase:
 
 def fingerprint() -> str:
     digest = hashlib.sha256()
-    for path in sorted(PERSISTENCE.rglob("*.py")):
+    # Not a recursive glob: other test processes add and remove __pycache__ folders
+    # here, and a folder that vanishes mid-walk leaves its iterator unclosed.
+    folders = [PERSISTENCE, PERSISTENCE / "migrations", PERSISTENCE / "migrations" / "versions"]
+    for path in sorted(path for folder in folders for path in folder.glob("*.py")):
         digest.update(path.relative_to(PERSISTENCE).as_posix().encode() + b"\0")
         digest.update(path.read_bytes() + b"\0")
     # The harness seeds the template too, so its own code is part of what was built.
@@ -87,11 +92,16 @@ def sweep(connection: psycopg.Connection[tuple[object, ...]]) -> list[str]:
     for (name,) in names.fetchall():
         assert isinstance(name, str)
         copy = COPY_NAME.fullmatch(name)
-        if copy is None or int(copy[1]) not in live:
-            connection.execute(
-                sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name))
-            )
-            dropped.append(name)
+        if copy is not None and int(copy[1]) in live:
+            continue
+        drop = sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(name))
+        try:
+            connection.execute(drop)
+        except (errors.InsufficientPrivilege, errors.ObjectInUse):
+            # Someone is still connected, such as another run's sweep test. The next
+            # sweep tries again.
+            continue
+        dropped.append(name)
     return dropped
 
 
@@ -114,4 +124,21 @@ def scratch(servers: Servers, run_pid: int, template: str | None) -> Iterator[Sc
         yield ScratchDatabase(name, servers)
     finally:
         with admin(servers) as connection:
-            connection.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(identifier))
+            drop(connection, identifier)
+
+
+def drop(connection: psycopg.Connection[tuple[object, ...]], database: sql.Identifier) -> None:
+    """Drop a copy once the runtime role's connections to it have gone.
+
+    A closed connection's server process exits a moment after the client, and the
+    migrator may not terminate another role's process, so FORCE alone can fail.
+    """
+    statement = sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(database)
+    for _ in range(DROP_ATTEMPTS - 1):
+        try:
+            connection.execute(statement)
+        except errors.InsufficientPrivilege:
+            time.sleep(0.1)
+        else:
+            return
+    connection.execute(statement)

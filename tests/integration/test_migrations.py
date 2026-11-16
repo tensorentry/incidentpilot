@@ -10,7 +10,7 @@ from incidentpilot.persistence import migrate
 from incidentpilot.persistence.isolation import LOCAL_OWNER_ID
 from tests.integration.harness import ScratchDatabase
 
-HEAD = "0003"
+HEAD = "0004"
 
 
 async def contents(database: ScratchDatabase) -> tuple[object, object]:

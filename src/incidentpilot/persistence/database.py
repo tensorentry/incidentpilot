@@ -19,10 +19,17 @@ from incidentpilot.settings import ConfigurationError
 
 type Connection = AsyncConnection[TupleRow]
 
-# Any of these lets a role read every owner's rows or turn the policies off.
+# Any of these lets a role read every owner's rows or turn the policies off, including
+# membership of a role that can, such as the scheduler role.
 _CAN_ESCAPE_ISOLATION = """
 SELECT role.rolsuper
     OR role.rolbypassrls
+    OR EXISTS (
+        SELECT FROM pg_catalog.pg_roles AS granted
+        WHERE granted.oid <> role.oid
+          AND (granted.rolsuper OR granted.rolbypassrls)
+          AND pg_catalog.pg_has_role(role.oid, granted.oid, 'MEMBER')
+    )
     OR EXISTS (
         SELECT FROM pg_catalog.pg_database
         WHERE datname = pg_catalog.current_database() AND datdba = role.oid
