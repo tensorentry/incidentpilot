@@ -52,7 +52,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 |---|---|---|---|
 | T3.1 | Compose Postgres, Alembic, owner and runtime roles, row-level security helper, two-owner test harness | done | [T3.1](tasks/T3.1.md) |
 | T3.2 | Snapshot table and import step | done | [T3.2](tasks/T3.2.md) |
-| T3.3 | Minimal sanitizer | todo | |
+| T3.3 | Minimal sanitizer | done | [T3.3](tasks/T3.3.md) |
 | T3.4 | Create-incident service with idempotency | todo | |
 | T3.5 | Start-investigation, event append, admission lock | todo | |
 | T3.6 | Fence primitive | todo | |
