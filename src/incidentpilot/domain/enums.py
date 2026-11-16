@@ -9,6 +9,15 @@ class RunMode(StrEnum):
     REPLAY = "replay"
 
 
+class IncidentSeverity(StrEnum):
+    """As the reporter judged it. The spec doesn't fix a scale, so sev1 is the worst."""
+
+    SEV1 = "sev1"
+    SEV2 = "sev2"
+    SEV3 = "sev3"
+    SEV4 = "sev4"
+
+
 class InvestigationStatus(StrEnum):
     QUEUED = "QUEUED"
     RUNNING = "RUNNING"
