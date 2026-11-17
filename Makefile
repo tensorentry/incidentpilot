@@ -45,7 +45,7 @@ migrate:
 
 # Imports scenarios/observations for the local owner; pass ARGS="--owner <uuid>" for another.
 import-snapshots:
-	$(UV_RUN) python -m incidentpilot.application.snapshots $(ARGS)
+	$(UV_RUN) incidentpilot $(ARGS) import-snapshots
 
 test-integration:
 	$(UV_RUN) pytest tests/integration

@@ -58,6 +58,22 @@ Two roles connect, and a third owns the few functions that must see every owner 
 
 The app refuses to start its runtime connection with a role that could bypass row security, including a member of one that can.
 
+### Command line
+
+Until the HTTP API exists, the `incidentpilot` command calls the application services directly (erratum E10). It acts for the local owner unless `--owner <uuid>` names another, and prints JSON.
+
+```bash
+uv run incidentpilot import-snapshots
+uv run incidentpilot create-incident --service checkout-api --severity sev2 \
+  --start 2026-11-04T18:15:00Z --end 2026-11-04T18:45:00Z \
+  --description "Checkout p95 latency is up" --key my-key-1
+uv run incidentpilot start-investigation <incident-id> --snapshot snap-9cbd373fc274 \
+  --start 2026-11-04T18:15:00Z --end 2026-11-04T18:45:00Z
+uv run incidentpilot show-investigation <investigation-id>
+```
+
+Rerunning a command with the same `--key` returns the original result instead of creating another. Without `--key`, a fresh one is generated and printed.
+
 ## Configuration
 
 Copy `.env.example` to `.env`. With no configuration, the app runs in `offline_demo` mode and sends nothing off this machine.

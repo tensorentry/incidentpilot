@@ -23,6 +23,11 @@ _NEXT_SEQ = (
     " WHERE id = %s RETURNING next_event_seq - 1"
 )
 
+_LIST = (
+    "SELECT seq, event_type, payload, created_at FROM run_events"
+    " WHERE investigation_id = %s ORDER BY seq"
+)
+
 type Payload = Mapping[str, object]
 
 
@@ -71,3 +76,13 @@ async def append_event(
         (investigation_id, seq, event_type, PAYLOAD_VERSION, Jsonb(cleaned)),
     )
     return int(seq)
+
+
+async def list_events(
+    connection: Connection, investigation_id: InvestigationId
+) -> list[tuple[int, str, object, object]]:
+    """Every event for one investigation, in order: sequence, type, payload, time."""
+    cursor = await connection.execute(_LIST, (investigation_id,))
+    return [
+        (int(seq), str(kind), payload, at) for seq, kind, payload, at in await cursor.fetchall()
+    ]
