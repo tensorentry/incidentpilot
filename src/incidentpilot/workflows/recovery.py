@@ -2,8 +2,8 @@
 
 `close_attempt` is the one way an attempt ends. Publication (T3.12), cancellation, the
 sweeper and failure handling all call it, inside their own transaction and under the
-investigation row lock. It covers E9's attempt, slot and event steps; the ledger steps
-join it when the model-call and tool-call tables exist.
+investigation row lock. It covers E9's attempt, slot, model-call and event steps; tool
+calls join it with the gateway (T4.3).
 
 The sweeper ends what nobody else will:
 - a lease that expired: the attempt is LOST, then the investigation retries, unless its
@@ -29,6 +29,7 @@ from incidentpilot.domain.transitions import (
 )
 from incidentpilot.persistence.database import Connection, adopt_owner, scheduler_transaction
 from incidentpilot.persistence.events import append_event
+from incidentpilot.persistence.ledger import close_calls
 
 # §2.4: work waits at most 10 minutes in the queue.
 QUEUE_AGE = timedelta(minutes=10)
@@ -69,7 +70,8 @@ async def close_attempt(
     status: AttemptStatus,
     failure: FailureCategory | None = None,
 ) -> None:
-    """End one attempt: final status, free its slot, and record a loss or failure.
+    """End one attempt: final status, free its slot, close its open model calls, and
+    record a loss or failure.
 
     A success or cancellation is recorded by the caller's own terminal event, such as
     REPORT_PUBLISHED or INVESTIGATION_CANCELLED.
@@ -81,6 +83,7 @@ async def close_attempt(
     investigation_id = InvestigationId(row[1])
     await connection.execute(_END_ATTEMPT, (status, failure, attempt_id))
     await connection.execute(_RELEASE, (attempt_id,))
+    await close_calls(connection, attempt_id, failure)
     event = _ATTEMPT_EVENTS.get(status)
     if event is not None:
         await append_event(

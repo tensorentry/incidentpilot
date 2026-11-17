@@ -12,8 +12,10 @@ import pytest
 from incidentpilot.domain.enums import (
     AttemptStatus,
     EventType,
+    EvidenceKind,
     IncidentSeverity,
     InvestigationStatus,
+    ModelCallState,
     RunMode,
 )
 from tests.integration.harness import ScratchDatabase
@@ -78,6 +80,8 @@ async def test_every_unique_key_on_a_tenant_table_includes_the_owner(
         ("attempts", "status", {s.value for s in AttemptStatus}),
         ("investigations", "mode", {m.value for m in RunMode} - {RunMode.REPLAY.value}),
         ("run_events", "event_type", {e.value for e in EventType}),
+        ("model_calls", "state", {s.value for s in ModelCallState}),
+        ("evidence", "kind", {k.value for k in EvidenceKind}),
     ],
 )
 async def test_each_stored_vocabulary_matches_its_enum(
@@ -88,7 +92,7 @@ async def test_each_stored_vocabulary_matches_its_enum(
             "SELECT pg_catalog.pg_get_constraintdef(oid) FROM pg_catalog.pg_constraint"
             " WHERE conrelid = %s::regclass AND contype = 'c'"
             " AND pg_catalog.pg_get_constraintdef(oid) LIKE %s",
-            (table, f"%({column} = ANY%"),
+            (table, f"CHECK (({column} = ANY%"),
         )
         (definition,) = await cursor.fetchone() or ("",)
 
