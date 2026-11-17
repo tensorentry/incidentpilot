@@ -6,7 +6,6 @@ from uuid import uuid4
 
 import pytest
 
-from incidentpilot.application.investigations import start_investigation
 from incidentpilot.domain.enums import (
     AttemptStatus,
     FailureCategory,
@@ -24,45 +23,10 @@ from incidentpilot.workflows.lease import LeaseKeeper
 from incidentpilot.workflows.recovery import Swept, close_attempt, sweep, sweep_once
 from incidentpilot.workflows.worker import Worker
 from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase
-from tests.integration.seeding import seed, start_request
+from tests.integration.seeding import claimed, expire, queue, update
 
 OFFLINE = RunMode.OFFLINE_DEMO
 NOW = timedelta(0)
-
-
-async def queue(
-    connection: Connection, owner: OwnerId = OWNER_A, n: int = 1, tag: str = "q"
-) -> list[InvestigationId]:
-    seeded = await seed(connection, owner, key=f"seed-{tag}")
-    ids = []
-    for i in range(n):
-        started = await start_investigation(
-            connection, owner, OFFLINE, seeded.incident_id, f"{tag}-{i}", start_request()
-        )
-        ids.append(started.investigation.id)
-    return ids
-
-
-async def claimed(connection: Connection, owner: OwnerId = OWNER_A) -> Lease:
-    await queue(connection, owner)
-    lease = await claim_next(connection, "crashed-worker", OFFLINE)
-    assert lease is not None
-    return lease
-
-
-async def update(connection: Connection, owner: OwnerId, sql: str, *params: object) -> None:
-    async with owner_transaction(connection, owner):
-        await connection.execute(sql, params)
-
-
-async def expire(connection: Connection, lease: Lease) -> None:
-    await update(
-        connection,
-        lease.owner_id,
-        "UPDATE investigations SET lease_expires_at = pg_catalog.clock_timestamp()"
-        " - interval '1 second' WHERE id = %s",
-        lease.investigation_id,
-    )
 
 
 async def investigation(

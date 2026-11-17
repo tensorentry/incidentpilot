@@ -13,6 +13,7 @@ from incidentpilot.domain.enums import EvidenceKind
 from incidentpilot.domain.evidence import (
     EVIDENCE_SELECTOR_ADAPTER,
     DeploymentRecordSelector,
+    EvidenceDraft,
     EvidenceRecord,
     EvidenceSelector,
     LogRecordSelector,
@@ -353,3 +354,57 @@ def test_a_series_selector_cannot_reach_outside_the_series(start: datetime, end:
 
     with pytest.raises(SelectorError, match=r"^selected window is outside the series$"):
         check_selector(selector, record(), owner_id=OWNER, snapshot_id=SNAPSHOT)
+
+
+def draft(
+    kind: EvidenceKind = EvidenceKind.METRIC_SERIES_WINDOW, /, **changes: Any
+) -> EvidenceDraft:
+    fields: dict[str, Any] = {
+        "kind": kind,
+        "source_ref": "metric_series_window:checkout-api:request_count:60s",
+        "adapter_version": "fixture-v1",
+        "window": SERIES if kind in WINDOWED else None,
+        "content": CONTENT,
+    }
+    return EvidenceDraft.model_validate(fields | changes)
+
+
+@pytest.mark.parametrize("kind", list(EvidenceKind))
+def test_drafts_are_valid_for_every_kind(kind: EvidenceKind) -> None:
+    assert draft(kind).kind is kind
+
+
+@pytest.mark.parametrize("kind", sorted(WINDOWED))
+def test_windowed_drafts_need_a_window(kind: EvidenceKind) -> None:
+    with pytest.raises(ValidationError, match=f"{kind} evidence needs a window"):
+        draft(kind, window=None)
+
+
+@pytest.mark.parametrize("kind", sorted(set(EvidenceKind) - WINDOWED))
+def test_single_record_drafts_have_no_window(kind: EvidenceKind) -> None:
+    with pytest.raises(ValidationError, match=f"{kind} evidence has no window"):
+        draft(kind, window=SERIES)
+
+
+@pytest.mark.parametrize(("field", "length"), [("source_ref", 513), ("adapter_version", 65)])
+def test_draft_identity_fields_are_bounded(field: str, length: int) -> None:
+    draft(**{field: "x" * (length - 1)})
+    with pytest.raises(ValidationError, match=field):
+        draft(**{field: "x" * length})
+    with pytest.raises(ValidationError, match=field):
+        draft(**{field: ""})
+
+
+@pytest.mark.parametrize(
+    "smuggled",
+    [
+        {"evidence_id": str(EVIDENCE_ID)},
+        {"owner_id": str(OWNER)},
+        {"snapshot_id": SNAPSHOT},
+        {"redaction_version": "none"},
+        {"content_sha256": sha256_digest(CONTENT)},
+    ],
+)
+def test_a_draft_cannot_carry_what_committing_decides(smuggled: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        draft(**smuggled)

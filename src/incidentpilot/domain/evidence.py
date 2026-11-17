@@ -50,6 +50,35 @@ EvidenceSelector = Annotated[
 EVIDENCE_SELECTOR_ADAPTER: TypeAdapter[EvidenceSelector] = TypeAdapter(EvidenceSelector)
 
 
+SourceRef = Annotated[str, Field(min_length=1, max_length=512)]
+Version = Annotated[str, Field(min_length=1, max_length=64)]
+
+
+def _check_window(kind: EvidenceKind, window: TimeWindow | None) -> None:
+    if kind in _WINDOWED and window is None:
+        raise ValueError(f"{kind} evidence needs a window")
+    if kind not in _WINDOWED and window is not None:
+        raise ValueError(f"{kind} evidence has no window")
+
+
+class EvidenceDraft(Contract):
+    """A source record before it is committed: no ID, owner or snapshot yet.
+
+    Committing sanitizes it and takes the owner and snapshot from the investigation.
+    """
+
+    kind: EvidenceKind
+    source_ref: SourceRef
+    adapter_version: Version
+    window: TimeWindow | None
+    content: dict[str, JsonValue]
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        _check_window(self.kind, self.window)
+        return self
+
+
 class EvidenceRecord(Contract):
     """One evidence row: the smallest citable source record (E15), owned per E19."""
 
@@ -57,19 +86,16 @@ class EvidenceRecord(Contract):
     owner_id: OwnerId
     snapshot_id: Annotated[SnapshotId, Field(min_length=1, max_length=128)]
     kind: EvidenceKind
-    source_ref: Annotated[str, Field(min_length=1, max_length=512)]
-    adapter_version: Annotated[str, Field(min_length=1, max_length=64)]
-    redaction_version: Annotated[str, Field(min_length=1, max_length=64)]
+    source_ref: SourceRef
+    adapter_version: Version
+    redaction_version: Version
     window: TimeWindow | None
     content: dict[str, JsonValue]
     content_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
-        if self.kind in _WINDOWED and self.window is None:
-            raise ValueError(f"{self.kind} evidence needs a window")
-        if self.kind not in _WINDOWED and self.window is not None:
-            raise ValueError(f"{self.kind} evidence has no window")
+        _check_window(self.kind, self.window)
         if sha256_digest(self.content) != self.content_sha256:
             raise ValueError("content doesn't match its digest")
         return self
