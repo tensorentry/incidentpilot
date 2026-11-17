@@ -59,7 +59,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | T3.7 | CLI over application services | done | [T3.7](tasks/T3.7.md) |
 | T3.8 | Attempts, capacity slots, claim transaction | done | [T3.8](tasks/T3.8.md) |
 | T3.9 | Worker loop and lease renewal | done | [T3.9](tasks/T3.9.md) |
-| T3.10 | Sweeper, `LOST`, recovery, shared terminal transition | todo | |
+| T3.10 | Sweeper, `LOST`, recovery, shared terminal transition | done | [T3.10](tasks/T3.10.md) |
 | T3.11 | Scripted fake model with real fenced writes | todo | |
 | T3.12 | Atomic terminal publication | todo | |
 | T3.13 | Kill/restart demo | todo | |

@@ -15,3 +15,7 @@ class IdempotencyConflict(RequestError):
 
 class Rejected(RequestError):
     """The request is well formed, but the system won't accept it, such as a full queue."""
+
+
+class Conflict(RequestError):
+    """The resource is in a state that forbids the request, such as an ended investigation."""

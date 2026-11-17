@@ -70,9 +70,10 @@ uv run incidentpilot create-incident --service checkout-api --severity sev2 \
 uv run incidentpilot start-investigation <incident-id> --snapshot snap-9cbd373fc274 \
   --start 2026-11-04T18:15:00Z --end 2026-11-04T18:45:00Z
 uv run incidentpilot show-investigation <investigation-id>
+uv run incidentpilot cancel-investigation <investigation-id>
 ```
 
-Rerunning a command with the same `--key` returns the original result instead of creating another. Without `--key`, a fresh one is generated and printed.
+Rerunning a command with the same `--key` returns the original result instead of creating another. Without `--key`, a fresh one is generated and printed. Cancelling an investigation that has already ended fails; cancelling one that's already cancelled reports that nothing changed.
 
 ## Configuration
 

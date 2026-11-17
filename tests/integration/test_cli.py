@@ -139,3 +139,18 @@ async def test_an_import_error_exits_with_its_reason(
             "--root",
             str(OBSERVATIONS),
         )
+
+
+async def test_cancel_reports_whether_it_changed_anything(
+    connected: ScratchDatabase, capsys: pytest.CaptureFixture[str]
+) -> None:
+    await run(capsys, "import-snapshots", "--root", str(OBSERVATIONS))
+    incident = await run(capsys, *create())
+    started = await run(capsys, *start(incident["incident"]["id"]))
+    investigation_id = started["investigation"]["id"]
+
+    first = await run(capsys, "cancel-investigation", investigation_id)
+    again = await run(capsys, "cancel-investigation", investigation_id)
+
+    assert (first["cancelled"], again["cancelled"]) == (True, False)
+    assert first["investigation"]["status"] == "CANCELLED"
