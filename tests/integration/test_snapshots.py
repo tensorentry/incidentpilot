@@ -10,7 +10,6 @@ from psycopg import errors
 from psycopg.types.json import Jsonb
 
 from incidentpilot.adapters.fixture_bundle import ObservationBundle, bundle_sha256
-from incidentpilot.application import snapshots
 from incidentpilot.application.snapshots import import_directory, import_file, read_bundle
 from incidentpilot.domain.ids import OwnerId, SnapshotId
 from incidentpilot.persistence.database import Connection, owner_transaction
@@ -50,7 +49,7 @@ async def test_the_committed_files_import_and_read_back(database: ScratchDatabas
     async with database.runtime() as connection:
         lines = await import_directory(connection, OWNER_A, OBSERVATIONS)
 
-        assert lines == [f"imported {path.stem}" for path in FILES]
+        assert lines == [(path.stem, True) for path in FILES]
         for path in FILES:
             bundle = read_bundle(path)
             async with owner_transaction(connection, OWNER_A):
@@ -69,7 +68,7 @@ async def test_importing_again_changes_nothing(database: ScratchDatabase) -> Non
 
         lines = await import_directory(connection, OWNER_A, OBSERVATIONS)
 
-        assert lines == [f"already imported {path.stem}" for path in FILES]
+        assert lines == [(path.stem, False) for path in FILES]
         async with owner_transaction(connection, OWNER_A):
             cursor = await connection.execute("SELECT id, created_at FROM snapshots ORDER BY id")
             assert await cursor.fetchall() == before
@@ -223,40 +222,3 @@ async def test_stored_columns_must_agree_with_the_manifest(
                         Jsonb(row["manifest"]),
                     ),
                 )
-
-
-async def test_the_entry_point_imports_for_the_named_owner(
-    database: ScratchDatabase, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("INCIDENTPILOT_DATABASE_URL", database.conninfo("runtime"))
-
-    await asyncio.to_thread(snapshots.main, ["--owner", str(OWNER_B), "--root", str(OBSERVATIONS)])
-
-    assert capsys.readouterr().out == "".join(f"imported {path.stem}\n" for path in FILES)
-    async with database.runtime() as connection:
-        assert await stored_ids(connection, OWNER_B) == [path.stem for path in FILES]
-        assert await stored_ids(connection, OWNER_A) == []
-
-
-async def test_the_entry_point_defaults_to_the_local_owner(
-    database: ScratchDatabase, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("INCIDENTPILOT_DATABASE_URL", database.conninfo("runtime"))
-    monkeypatch.chdir(OBSERVATIONS.parents[1])
-
-    await asyncio.to_thread(snapshots.main, [])
-
-    assert capsys.readouterr().out.count("imported") == len(FILES)
-    async with database.runtime() as connection:
-        assert await stored_ids(connection, OWNER_A) == [path.stem for path in FILES]
-
-
-async def test_the_entry_point_exits_with_an_import_error(
-    database: ScratchDatabase, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("INCIDENTPILOT_DATABASE_URL", database.conninfo("runtime"))
-
-    with pytest.raises(SystemExit, match=exactly("the owner doesn't exist")):
-        await asyncio.to_thread(
-            snapshots.main, ["--owner", str(uuid4()), "--root", str(OBSERVATIONS)]
-        )

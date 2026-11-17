@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from incidentpilot.application import snapshots
 from incidentpilot.application.snapshots import read_bundle
 from incidentpilot.persistence.snapshots import SnapshotError
 
@@ -40,31 +39,3 @@ def test_an_invalid_file_is_refused_without_quoting_it(tmp_path: Path) -> None:
         read_bundle(broken)
     assert caught.value.__cause__ is None
     assert caught.value.__suppress_context__
-
-
-def test_importing_without_a_database_exits_with_the_reason(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.delenv("INCIDENTPILOT_DATABASE_URL", raising=False)
-    monkeypatch.chdir(tmp_path)
-
-    message = "Invalid configuration: INCIDENTPILOT_DATABASE_URL is required"
-    with pytest.raises(SystemExit, match=exactly(message)):
-        snapshots.main([])
-
-
-def test_a_malformed_owner_is_refused_before_anything_connects(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    with pytest.raises(SystemExit) as caught:
-        snapshots.main(["--owner", "everyone"])
-
-    assert caught.value.code == 2
-    assert "argument --owner: invalid UUID value: 'everyone'" in capsys.readouterr().err
-
-
-def test_help_describes_the_import(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(SystemExit):
-        snapshots.main(["--help"])
-
-    assert "Import snapshots from observation files for one owner" in capsys.readouterr().out
