@@ -9,10 +9,16 @@ from dataclasses import dataclass
 from typing import Literal
 from uuid import uuid4
 
-from incidentpilot.application.errors import NotFound, Rejected, RequestError
+from incidentpilot.application.errors import Conflict, NotFound, Rejected, RequestError
 from incidentpilot.application.idempotent import check_key, claim_or_replay
 from incidentpilot.domain.canonical import sha256_digest
-from incidentpilot.domain.enums import EventType, RunMode
+from incidentpilot.domain.enums import (
+    AttemptStatus,
+    EventType,
+    InvestigationStatus,
+    RunMode,
+    TerminationReason,
+)
 from incidentpilot.domain.ids import IncidentId, InvestigationId, OwnerId
 from incidentpilot.domain.investigation import (
     QUEUE_LIMIT,
@@ -21,11 +27,13 @@ from incidentpilot.domain.investigation import (
     InvestigationRecord,
     StartInvestigation,
 )
+from incidentpilot.domain.transitions import is_terminal_investigation
 from incidentpilot.persistence.database import Connection, owner_transaction
 from incidentpilot.persistence.events import append_event
 from incidentpilot.persistence.incidents import get_incident
 from incidentpilot.persistence.investigations import get_investigation, insert_investigation
 from incidentpilot.persistence.snapshots import get_snapshot
+from incidentpilot.workflows.recovery import close_attempt, end_investigation
 
 OPERATION = "start_investigation"
 # Any fixed key works, as long as only the start path takes it (E11).
@@ -34,6 +42,7 @@ ADMISSION_LOCK = 3_141_592
 # out of reach of mutations that only flip their case.
 _LOCK_ADMISSION = "SELECT pg_advisory_xact_lock(%s)"
 _COUNT_QUEUED = "SELECT queued_investigation_count()"
+_LOCK_FOR_CANCEL = "SELECT status, current_attempt_id FROM investigations WHERE id = %s FOR UPDATE"
 
 
 @dataclass(frozen=True)
@@ -137,3 +146,42 @@ async def _admit(connection: Connection) -> None:
     assert row is not None  # noqa: S101 (count always returns one row)
     if row[0] >= QUEUE_LIMIT:
         raise Rejected(f"the queue already holds {QUEUE_LIMIT} investigations")
+
+
+@dataclass(frozen=True)
+class CancelledInvestigation:
+    investigation: InvestigationRecord
+    # False when it was already cancelled.
+    changed: bool
+
+
+async def cancel_investigation(
+    connection: Connection, owner_id: OwnerId, investigation_id: InvestigationId
+) -> CancelledInvestigation:
+    """Cancel queued or running work (spec D09; erratum E9).
+
+    The investigation row lock decides any race with publication: whichever commits
+    first wins, and the other sees the final state. Cancelling twice is not an error;
+    cancelling work that already completed or failed is a conflict.
+    """
+    async with owner_transaction(connection, owner_id):
+        row = await (await connection.execute(_LOCK_FOR_CANCEL, (investigation_id,))).fetchone()
+        if row is None:
+            raise NotFound(f"investigation {investigation_id} doesn't exist")
+        status, attempt_id = InvestigationStatus(row[0]), row[1]
+        if status is not InvestigationStatus.CANCELLED:
+            if is_terminal_investigation(status):
+                raise Conflict(f"investigation {investigation_id} has already ended: {status}")
+            if attempt_id is not None:
+                await close_attempt(connection, attempt_id, AttemptStatus.CANCELLED)
+            await end_investigation(
+                connection,
+                investigation_id,
+                status,
+                InvestigationStatus.CANCELLED,
+                TerminationReason.CANCELLED,
+                EventType.INVESTIGATION_CANCELLED,
+            )
+        stored = await get_investigation(connection, investigation_id)
+        assert stored is not None  # noqa: S101 (locked above, and never deleted)
+        return CancelledInvestigation(stored, changed=status is not InvestigationStatus.CANCELLED)

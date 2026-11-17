@@ -12,6 +12,7 @@ SCHEDULER_FUNCTIONS = {
     "claimable_investigation",
     "bind_capacity_slot",
     "release_capacity_slot",
+    "sweepable_investigation",
 }
 
 

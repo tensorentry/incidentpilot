@@ -27,6 +27,7 @@ def test_the_owner_defaults_to_the_local_owner() -> None:
         ["--owner", "everyone", "import-snapshots"],
         ["start-investigation", "not-a-uuid", "--snapshot", "s", "--start", "a", "--end", "b"],
         ["show-investigation", "not-a-uuid"],
+        ["cancel-investigation", "not-a-uuid"],
         [
             "create-incident",
             "--service",
@@ -41,7 +42,7 @@ def test_the_owner_defaults_to_the_local_owner() -> None:
             "d",
         ],
     ],
-    ids=["owner", "incident", "investigation", "severity"],
+    ids=["owner", "incident", "investigation", "cancel", "severity"],
 )
 def test_malformed_arguments_are_usage_errors(
     argv: list[str], capsys: pytest.CaptureFixture[str]
@@ -173,6 +174,7 @@ def test_help_names_the_program_and_each_command(
         ("create-incident", "report an incident"),
         ("start-investigation", "queue an investigation"),
         ("show-investigation", "state, configuration and events"),
+        ("cancel-investigation", "stop queued or running work"),
     ]:
         assert f"{command} {summary}" in text
 

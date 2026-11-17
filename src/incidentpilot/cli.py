@@ -16,7 +16,7 @@ from pydantic import BaseModel, ValidationError
 
 from incidentpilot.application.errors import NotFound, RequestError
 from incidentpilot.application.incidents import create_incident
-from incidentpilot.application.investigations import start_investigation
+from incidentpilot.application.investigations import cancel_investigation, start_investigation
 from incidentpilot.application.snapshots import OBSERVATIONS, import_directory
 from incidentpilot.domain.enums import IncidentSeverity, RunMode
 from incidentpilot.domain.ids import IncidentId, InvestigationId, OwnerId
@@ -65,6 +65,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     show = commands.add_parser("show-investigation", help="state, configuration and events")
     show.add_argument("investigation_id", type=UUID)
+
+    cancel = commands.add_parser("cancel-investigation", help="stop queued or running work")
+    cancel.add_argument("investigation_id", type=UUID)
     return parser
 
 
@@ -131,6 +134,14 @@ async def execute(
                 "idempotency_key": key,
                 "created": started.created,
                 "investigation": started.investigation.model_dump(mode="json"),
+            }
+        case "cancel-investigation":
+            cancelled = await cancel_investigation(
+                connection, owner, InvestigationId(arguments.investigation_id)
+            )
+            return {
+                "cancelled": cancelled.changed,
+                "investigation": cancelled.investigation.model_dump(mode="json"),
             }
         case _:
             return await show(connection, owner, InvestigationId(arguments.investigation_id))
