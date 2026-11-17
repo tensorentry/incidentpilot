@@ -1,6 +1,6 @@
 """Ending attempts and recovering from lost workers (spec §6.1 to §6.4; errata E1, E9).
 
-`close_attempt` is the one way an attempt ends. Publication (T3.12), cancellation, the
+`close_attempt` is the one way an attempt ends. Publication, cancellation, the
 sweeper and failure handling all call it, inside their own transaction and under the
 investigation row lock. It covers E9's attempt, slot, model-call and event steps; tool
 calls join it with the gateway (T4.3).
@@ -28,7 +28,7 @@ from incidentpilot.domain.transitions import (
     require_investigation_transition,
 )
 from incidentpilot.persistence.database import Connection, adopt_owner, scheduler_transaction
-from incidentpilot.persistence.events import append_event
+from incidentpilot.persistence.events import Payload, append_event
 from incidentpilot.persistence.ledger import close_calls
 
 # §2.4: work waits at most 10 minutes in the queue.
@@ -101,8 +101,10 @@ async def end_investigation(
     status: InvestigationStatus,
     reason: TerminationReason,
     event: EventType,
+    details: Payload | None = None,
 ) -> None:
-    """Move an investigation to a terminal status. Its attempt must be closed already."""
+    """Move an investigation to a terminal status. Its attempt must be closed already.
+    `details` joins the reason in the event's payload."""
     require_investigation_transition(current, status)
     await connection.execute(
         """
@@ -113,7 +115,9 @@ async def end_investigation(
         """,
         (status, reason, investigation_id),
     )
-    await append_event(connection, investigation_id, event, {"reason": reason.value})
+    await append_event(
+        connection, investigation_id, event, {"reason": reason.value, **(details or {})}
+    )
 
 
 async def sweep_once(

@@ -11,12 +11,15 @@ import pytest
 
 from incidentpilot.domain.enums import (
     AttemptStatus,
+    DiagnosticOutcome,
     EventType,
     EvidenceKind,
     IncidentSeverity,
     InvestigationStatus,
     ModelCallState,
+    ReportAuthor,
     RunMode,
+    TerminationReason,
 )
 from tests.integration.harness import ScratchDatabase
 
@@ -82,6 +85,10 @@ async def test_every_unique_key_on_a_tenant_table_includes_the_owner(
         ("run_events", "event_type", {e.value for e in EventType}),
         ("model_calls", "state", {s.value for s in ModelCallState}),
         ("evidence", "kind", {k.value for k in EvidenceKind}),
+        ("investigations", "termination_reason", {r.value for r in TerminationReason}),
+        ("report_candidates", "author", {a.value for a in ReportAuthor}),
+        ("report_candidates", "termination_reason", {r.value for r in TerminationReason}),
+        ("diagnosis_reports", "diagnostic_outcome", {o.value for o in DiagnosticOutcome}),
     ],
 )
 async def test_each_stored_vocabulary_matches_its_enum(

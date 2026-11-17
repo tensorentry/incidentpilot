@@ -8,7 +8,7 @@ from pathlib import Path
 from incidentpilot.application.incidents import create_incident
 from incidentpilot.application.investigations import start_investigation
 from incidentpilot.application.snapshots import import_file, read_bundle
-from incidentpilot.domain.enums import RunMode
+from incidentpilot.domain.enums import InvestigationStatus, RunMode, TerminationReason
 from incidentpilot.domain.ids import IncidentId, InvestigationId, OwnerId
 from incidentpilot.domain.incident import CreateIncident
 from incidentpilot.domain.investigation import StartInvestigation
@@ -16,12 +16,18 @@ from incidentpilot.domain.snapshot import SnapshotManifest
 from incidentpilot.persistence.database import Connection, owner_transaction
 from incidentpilot.persistence.fence import Lease
 from incidentpilot.workflows.claim import claim_next
-from tests.integration.harness import OWNER_A
+from tests.integration.harness import OWNER_A, ScratchDatabase
 
 OBSERVATIONS = Path(__file__).resolve().parents[2] / "scenarios" / "observations"
 FIXTURE = sorted(OBSERVATIONS.glob("*.json"))[0]
 MANIFEST: SnapshotManifest = read_bundle(FIXTURE).manifest
 OFFLINE = RunMode.OFFLINE_DEMO
+# A plausible reason for each ended status, since an ended investigation must give one.
+ENDED_BECAUSE = {
+    InvestigationStatus.COMPLETED: TerminationReason.INVESTIGATOR_FINISHED,
+    InvestigationStatus.CANCELLED: TerminationReason.CANCELLED,
+    InvestigationStatus.FAILED: TerminationReason.RETRIES_EXHAUSTED,
+}
 
 
 @dataclass(frozen=True)
@@ -92,3 +98,12 @@ async def expire(connection: Connection, lease: Lease) -> None:
         " - interval '1 second' WHERE id = %s",
         lease.investigation_id,
     )
+
+
+async def bound_slots(database: ScratchDatabase) -> list[object]:
+    """The attempts holding capacity slots. Only the migrator may read the slots."""
+    async with database.migrator() as connection:
+        cursor = await connection.execute(
+            "SELECT attempt_id FROM capacity_slots WHERE attempt_id IS NOT NULL"
+        )
+        return [row[0] for row in await cursor.fetchall()]

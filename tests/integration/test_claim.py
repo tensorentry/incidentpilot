@@ -27,7 +27,7 @@ from incidentpilot.persistence.events import append_event
 from incidentpilot.persistence.fence import Lease, fenced_transaction
 from incidentpilot.workflows.claim import claim_next
 from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase
-from tests.integration.seeding import seed, start_request
+from tests.integration.seeding import ENDED_BECAUSE, seed, start_request
 
 OFFLINE = RunMode.OFFLINE_DEMO
 
@@ -282,7 +282,10 @@ async def test_work_that_isnt_waiting_is_never_claimed(
     async with database.runtime() as connection:
         await queue(connection, OWNER_A, 1)
         async with owner_transaction(connection, OWNER_A):
-            await connection.execute("UPDATE investigations SET status = %s", (status,))
+            await connection.execute(
+                "UPDATE investigations SET status = %s, termination_reason = %s",
+                (status, ENDED_BECAUSE.get(status)),
+            )
 
         assert await claim_next(connection, "w1", OFFLINE) is None
 

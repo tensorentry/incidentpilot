@@ -169,6 +169,15 @@ class UsageSummary(Contract):
     output_tokens: Annotated[int, Field(ge=0)]
 
 
+def check_authorship(author: ReportAuthor, reason: TerminationReason) -> None:
+    """Whether a report written by `author` may end an investigation for `reason`."""
+    if reason is TerminationReason.CANCELLED:
+        raise ValueError("a cancelled investigation publishes no report")
+    finished = reason is TerminationReason.INVESTIGATOR_FINISHED
+    if finished != (author is ReportAuthor.MODEL):
+        raise ValueError("only a finished investigator's candidate is published as written")
+
+
 class ReportExecution(Contract):
     # Replay is rejected when an investigation starts (E8), so it never publishes.
     mode: Literal[RunMode.OFFLINE_DEMO, RunMode.LIVE]
@@ -179,11 +188,7 @@ class ReportExecution(Contract):
 
     @model_validator(mode="after")
     def _author_matches_reason(self) -> Self:
-        if self.termination_reason is TerminationReason.CANCELLED:
-            raise ValueError("a cancelled investigation publishes no report")
-        finished = self.termination_reason is TerminationReason.INVESTIGATOR_FINISHED
-        if finished != (self.author is ReportAuthor.MODEL):
-            raise ValueError("only a finished investigator's candidate is published as written")
+        check_authorship(self.author, self.termination_reason)
         return self
 
 
