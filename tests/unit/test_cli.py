@@ -1,5 +1,7 @@
 """The CLI's argument handling, before anything connects (erratum E10)."""
 
+import asyncio
+import os
 import re
 from pathlib import Path
 
@@ -7,8 +9,10 @@ import pytest
 
 from incidentpilot import cli
 from incidentpilot.application.errors import RequestError
+from incidentpilot.domain.enums import RunMode
 from incidentpilot.domain.incident import CreateIncident
 from incidentpilot.persistence.isolation import LOCAL_OWNER_ID
+from incidentpilot.settings import Settings
 
 
 def exactly(message: str) -> str:
@@ -175,6 +179,7 @@ def test_help_names_the_program_and_each_command(
         ("start-investigation", "queue an investigation"),
         ("show-investigation", "state, configuration and events"),
         ("cancel-investigation", "stop queued or running work"),
+        ("worker", "run offline_demo investigations"),
     ]:
         assert f"{command} {summary}" in text
 
@@ -190,6 +195,12 @@ def test_help_explains_the_options_that_need_it(
     assert "--key KEY idempotency key; reuse it to retry safely" in create
     assert "--mode {offline_demo,live,replay} default: this process's --key KEY" in start
     assert "--key KEY idempotency key; reuse it to retry safely" in start
+    worker = help_text(capsys, "worker")
+
+    assert "--jobs JOBS stop after this many; default: never" in worker
+    assert (
+        "--provider-delay PROVIDER_DELAY seconds the scripted provider takes to answer each request"
+    ) in worker
 
 
 def test_validation_errors_give_the_field_path_and_separate_problems() -> None:
@@ -207,3 +218,60 @@ def test_validation_errors_give_the_field_path_and_separate_problems() -> None:
         r" window\.end_at: Input should be a valid datetime.*",
         str(caught.value),
     )
+
+
+def test_a_worker_runs_forever_on_default_leases_unless_told_otherwise() -> None:
+    arguments = cli.build_parser().parse_args(["worker"])
+
+    assert (
+        arguments.worker_id,
+        arguments.jobs,
+        arguments.lease_seconds,
+        arguments.provider_delay,
+    ) == (f"worker-{os.getpid()}", None, 30.0, 0.0)
+
+
+def test_worker_options_take_numbers() -> None:
+    argv = ["--worker-id", "w-1", "--jobs", "2", "--lease-seconds", "1.5"]
+    arguments = cli.build_parser().parse_args(["worker", *argv, "--provider-delay", "0.25"])
+
+    assert (arguments.worker_id, arguments.jobs, arguments.lease_seconds) == ("w-1", 2, 1.5)
+    assert arguments.provider_delay == 0.25
+
+
+@pytest.mark.parametrize(
+    ("argv", "error"),
+    [
+        (["--jobs", "0"], "argument --jobs: must be positive: 0"),
+        (["--jobs", "1.5"], "argument --jobs: invalid int value: '1.5'"),
+        (["--lease-seconds", "0"], "argument --lease-seconds: must be positive: 0"),
+        (["--lease-seconds", "-1"], "argument --lease-seconds: must be positive: -1"),
+        (["--lease-seconds", "soon"], "argument --lease-seconds: invalid float value: 'soon'"),
+    ],
+)
+def test_worker_counts_and_leases_must_be_positive(
+    argv: list[str],
+    error: str,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    # With no database, a value wrongly accepted fails on configuration instead of
+    # starting a worker.
+    monkeypatch.delenv("INCIDENTPILOT_DATABASE_URL", raising=False)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as caught:
+        cli.main(["worker", *argv])
+
+    assert caught.value.code == 2
+    assert capsys.readouterr().err.endswith(f"error: {error}\n")
+
+
+@pytest.mark.parametrize("mode", [RunMode.LIVE, RunMode.REPLAY])
+def test_only_the_offline_demo_has_a_worker(mode: RunMode) -> None:
+    arguments = cli.build_parser().parse_args(["worker"])
+    settings = Settings.model_construct(mode=mode)
+
+    message = "only offline_demo has a worker until the live investigator (T4.7)"
+    with pytest.raises(RequestError, match=exactly(message)):
+        asyncio.run(cli.work("unused", settings, arguments))

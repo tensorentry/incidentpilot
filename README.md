@@ -2,7 +2,7 @@
 
 A local-first lab for evidence-linked investigation of simulated service incidents, using one bounded AI investigator. It's a learning and engineering showcase, not a production incident tool.
 
-**Status:** early implementation. The toolchain, settings and core domain types exist. PostgreSQL, its roles and the snapshot registry exist. There's no worker or agent yet, and no benchmark has been run. See [`docs/delivery/TASKS.md`](docs/delivery/TASKS.md).
+**Status:** early implementation. The toolchain, settings and core domain types exist. PostgreSQL, its roles and the snapshot registry exist. A worker runs investigations end to end with a scripted stand-in for the model, and recovers from crashes. There's no live agent yet, and no benchmark has been run. See [`docs/delivery/TASKS.md`](docs/delivery/TASKS.md).
 
 ## Design documents
 
@@ -74,6 +74,17 @@ uv run incidentpilot cancel-investigation <investigation-id>
 ```
 
 Rerunning a command with the same `--key` returns the original result instead of creating another. Without `--key`, a fresh one is generated and printed. Cancelling an investigation that has already ended fails; cancelling one that's already cancelled reports that nothing changed.
+
+### Workers and the kill/restart demo
+
+`uv run incidentpilot worker` claims queued `offline_demo` investigations and runs them until it is stopped. Pass `--jobs N` to stop after N investigations have ended. It plays a scripted stand-in for the model, which writes real ledger, evidence and report rows; the live investigator comes later. Between claims it sweeps up investigations whose worker died, so a worker started after a crash recovers the dead worker's work. Each worker uses two runtime connections.
+
+`make demo` shows that recovery with real processes, using 2-second leases:
+
+1. **Kill and restart.** It kills one worker with SIGKILL while a model call is in flight, then starts another. The second worker finds the lapsed lease, marks the first attempt `LOST` and its call `UNKNOWN`, and completes the investigation at epoch 2 with one report.
+2. **A stale worker wakes up.** It freezes a worker with SIGSTOP mid-call, lets a second one recover and publish, then resumes the first. The first worker's late commit, still at epoch 1, is refused.
+
+It checks the database after each scene, and exits non-zero if anything doesn't match. It needs `make migrate` first, and takes about 15 seconds.
 
 ## Configuration
 
