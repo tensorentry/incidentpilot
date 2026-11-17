@@ -43,6 +43,10 @@ WHERE role.rolname = current_user
 """
 
 
+_CURRENT_OWNER = "SELECT current_owner_id()"
+_SET_OWNER = "SELECT pg_catalog.set_config(%s, %s, true)"
+
+
 class OwnerContextError(RuntimeError):
     """An owner transaction was opened where its owner could leak or be overridden."""
 
@@ -72,7 +76,29 @@ async def owner_transaction(connection: Connection, owner_id: OwnerId) -> AsyncI
         # Inside another transaction, the owner would outlive this block.
         raise OwnerContextError("an owner transaction can't start inside another transaction")
     async with connection.transaction():
-        await connection.execute(
-            "SELECT pg_catalog.set_config(%s, %s, true)", (OWNER_SETTING, str(owner_id))
-        )
+        await connection.execute(_SET_OWNER, (OWNER_SETTING, str(owner_id)))
         yield connection
+
+
+@asynccontextmanager
+async def scheduler_transaction(connection: Connection) -> AsyncIterator[Connection]:
+    """A transaction that starts with no owner, for the scheduler (erratum E19).
+
+    With no owner, row-level security shows it nothing, so its only cross-owner access
+    is through the SECURITY DEFINER functions. Once one has picked a row, `adopt_owner`
+    sets that row's owner for the rest of the transaction.
+    """
+    if not connection.autocommit or connection.info.transaction_status != TransactionStatus.IDLE:
+        raise OwnerContextError("a scheduler transaction can't start inside another transaction")
+    async with connection.transaction():
+        yield connection
+
+
+async def adopt_owner(connection: Connection, owner_id: OwnerId) -> None:
+    """Give a scheduler transaction its owner. An owner, once set, can't be replaced."""
+    if connection.info.transaction_status != TransactionStatus.INTRANS:
+        raise OwnerContextError("an owner can only be adopted inside a transaction")
+    row = await (await connection.execute(_CURRENT_OWNER)).fetchone()
+    if row != (None,):
+        raise OwnerContextError("this transaction already has an owner")
+    await connection.execute(_SET_OWNER, (OWNER_SETTING, str(owner_id)))

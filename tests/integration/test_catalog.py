@@ -1,6 +1,7 @@
 """Every tenant table is under owner isolation (erratum E19).
 
-Only the owners table and Alembic's own table are exempt. T3.14 widens this into the
+Only the owners table, the installation-wide capacity slots and Alembic's own table
+are exempt. T3.14 widens this into the
 full catalog check: keys, foreign keys, roles and definer functions.
 """
 
@@ -8,10 +9,17 @@ import re
 
 import pytest
 
-from incidentpilot.domain.enums import EventType, IncidentSeverity, InvestigationStatus, RunMode
+from incidentpilot.domain.enums import (
+    AttemptStatus,
+    EventType,
+    IncidentSeverity,
+    InvestigationStatus,
+    RunMode,
+)
 from tests.integration.harness import ScratchDatabase
 
-EXEMPT = {"alembic_version", "owners"}
+# E19: only these have no owner column. Capacity slots are installation-wide.
+EXEMPT = {"alembic_version", "owners", "capacity_slots"}
 
 
 async def test_every_other_table_is_isolated_by_owner(database: ScratchDatabase) -> None:
@@ -67,6 +75,7 @@ async def test_every_unique_key_on_a_tenant_table_includes_the_owner(
     [
         ("incidents", "severity", {s.value for s in IncidentSeverity}),
         ("investigations", "status", {s.value for s in InvestigationStatus}),
+        ("attempts", "status", {s.value for s in AttemptStatus}),
         ("investigations", "mode", {m.value for m in RunMode} - {RunMode.REPLAY.value}),
         ("run_events", "event_type", {e.value for e in EventType}),
     ],
