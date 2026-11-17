@@ -82,6 +82,22 @@ async def calls(
         return list(await cursor.fetchall())
 
 
+async def outcome(connection: Connection, lease: Lease) -> tuple[object, ...]:
+    """The investigation's status, and the attempt and observation count of its report."""
+    async with owner_transaction(connection, lease.owner_id):
+        cursor = await connection.execute(
+            "SELECT i.status, r.attempt_id,"
+            " jsonb_array_length(r.report -> 'candidate' -> 'observations'),"
+            " (r.report -> 'execution' ->> 'attempt_count')::int"
+            " FROM investigations AS i LEFT JOIN diagnosis_reports AS r"
+            " ON r.investigation_id = i.id WHERE i.id = %s",
+            (lease.investigation_id,),
+        )
+        rows = await cursor.fetchall()
+    assert len(rows) == 1
+    return tuple(rows[0])
+
+
 async def seen(connection: Connection, lease: Lease) -> list[str]:
     async with owner_transaction(connection, lease.owner_id):
         records = await visible_evidence(connection, lease.investigation_id)
@@ -117,7 +133,10 @@ async def test_a_script_runs_to_the_end(database: ScratchDatabase) -> None:
             "EVIDENCE_COMMITTED",
             "MODEL_CALL_DISPATCHED",
             "MODEL_CALL_SETTLED",
+            "VALIDATION_STARTED",
+            "REPORT_PUBLISHED",
         ]
+        assert await outcome(connection, lease) == ("COMPLETED", lease.attempt_id, 3, 1)
 
 
 async def test_a_crash_after_dispatch_leaves_an_unknown_call_and_recovers(
@@ -150,6 +169,28 @@ async def test_a_crash_after_dispatch_leaves_an_unknown_call_and_recovers(
         }
         # The lost attempt's evidence was reused, not stored again.
         assert await seen(connection, retry) == [f"log/checkout-api/{n}" for n in (1, 2, 3)]
+        assert await outcome(connection, retry) == ("COMPLETED", retry.attempt_id, 3, 2)
+
+
+async def test_a_crash_during_validation_publishes_the_stored_candidate(
+    database: ScratchDatabase,
+) -> None:
+    model = ScriptedModel(SCRIPT, {len(SCRIPT): Fault.CRASH_BEFORE_PUBLISH})
+    async with database.runtime() as connection, database.runtime() as keeping:
+        await queue(connection)
+        crashed = await run(connection, keeping, model, "crashed")
+        assert crashed is not None
+        assert (await outcome(connection, crashed))[:2] == ("VALIDATING", None)
+        spent = await counters(connection, crashed)
+
+        await recover(connection, crashed)
+        retry = await run(connection, keeping, model, "rescuer")
+        assert retry is not None
+
+        # E1: the retry validates what was handed in, with no new model calls.
+        assert await counters(connection, retry) == spent
+        assert [mine for mine, _ in await calls(connection, retry)] == [False] * 3
+        assert await outcome(connection, retry) == ("COMPLETED", retry.attempt_id, 3, 2)
 
 
 async def test_a_crash_before_dispatch_releases_the_reservation(database: ScratchDatabase) -> None:
@@ -196,6 +237,7 @@ async def test_a_provider_error_fails_the_step_and_the_script_goes_on(
         }
         # The failed step's evidence was never committed.
         assert await seen(connection, lease) == ["log/checkout-api/1", "log/checkout-api/2"]
+        assert await outcome(connection, lease) == ("COMPLETED", lease.attempt_id, 2, 1)
 
 
 async def test_the_script_stops_when_the_budget_is_spent(
@@ -216,8 +258,9 @@ async def test_the_script_stops_when_the_budget_is_spent(
             f"script stopped on investigation {investigation}: investigation {investigation}"
             " can't reserve a model call: its budget is spent"
         ]
-        # Stopping isn't a crash: the attempt still holds its lease for publication.
+        # Stopping isn't a crash: the attempt still holds its lease, for the fallback (T4.8).
         assert await claim_next(connection, "other", OFFLINE) is None
+        assert await outcome(connection, lease) == ("RUNNING", None, None, None)
 
 
 async def test_nothing_starts_once_the_lease_is_lost(database: ScratchDatabase) -> None:
@@ -232,13 +275,22 @@ async def test_nothing_starts_once_the_lease_is_lost(database: ScratchDatabase) 
         assert await calls(connection, lease) == []
 
 
-@pytest.mark.parametrize("fault", [Fault.CRASH_AFTER_RESERVE, Fault.CRASH_AFTER_DISPATCH])
-async def test_a_planted_crash_names_itself(database: ScratchDatabase, fault: Fault) -> None:
+@pytest.mark.parametrize(
+    ("fault", "step"),
+    [
+        (Fault.CRASH_AFTER_RESERVE, 1),
+        (Fault.CRASH_AFTER_DISPATCH, 1),
+        (Fault.CRASH_BEFORE_PUBLISH, len(SCRIPT)),
+    ],
+)
+async def test_a_planted_crash_names_itself(
+    database: ScratchDatabase, fault: Fault, step: int
+) -> None:
     async with database.runtime() as connection, database.runtime() as keeping:
         await queue(connection)
         lease = await claim_next(connection, "w", OFFLINE)
         assert lease is not None
         keeper = LeaseKeeper(keeping, lease, timedelta(seconds=30), timedelta(seconds=10))
-        model = ScriptedModel(SCRIPT, {1: fault})
-        with pytest.raises(Crash, match=rf"^planted {fault.name.lower()} at step 1$"):
+        model = ScriptedModel(SCRIPT, {step: fault})
+        with pytest.raises(Crash, match=rf"^planted {fault.name.lower()} at step {step}$"):
             await model(connection, lease, keeper)

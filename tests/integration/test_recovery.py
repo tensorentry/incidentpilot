@@ -23,7 +23,7 @@ from incidentpilot.workflows.lease import LeaseKeeper
 from incidentpilot.workflows.recovery import Swept, close_attempt, sweep, sweep_once
 from incidentpilot.workflows.worker import Worker
 from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase
-from tests.integration.seeding import claimed, expire, queue, update
+from tests.integration.seeding import bound_slots, claimed, expire, queue, update
 
 OFFLINE = RunMode.OFFLINE_DEMO
 NOW = timedelta(0)
@@ -61,14 +61,6 @@ async def event_types(
 ) -> list[str]:
     async with owner_transaction(connection, owner):
         return [kind for _, kind, _, _ in await list_events(connection, investigation_id)]
-
-
-async def bound_slots(database: ScratchDatabase) -> list[object]:
-    async with database.migrator() as connection:
-        cursor = await connection.execute(
-            "SELECT attempt_id FROM capacity_slots WHERE attempt_id IS NOT NULL"
-        )
-        return [row[0] for row in await cursor.fetchall()]
 
 
 # close_attempt

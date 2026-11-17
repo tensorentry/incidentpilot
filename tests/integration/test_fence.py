@@ -14,7 +14,7 @@ from incidentpilot.persistence.database import Connection, owner_transaction
 from incidentpilot.persistence.events import append_event
 from incidentpilot.persistence.fence import Lease, StaleLease, fenced_transaction
 from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase, still_blocked
-from tests.integration.seeding import seed, start_request
+from tests.integration.seeding import ENDED_BECAUSE, seed, start_request
 
 LIVE = timedelta(seconds=30)
 
@@ -42,9 +42,17 @@ async def take_over(
 ) -> None:
     async with owner_transaction(connection, lease.owner_id):
         await connection.execute(
-            "UPDATE investigations SET status = %s, current_attempt_id = %s, lease_epoch = %s,"
+            "UPDATE investigations SET status = %s, termination_reason = %s,"
+            " current_attempt_id = %s, lease_epoch = %s,"
             " lease_expires_at = pg_catalog.clock_timestamp() + %s WHERE id = %s",
-            (status, lease.attempt_id, lease.epoch, expires_in, lease.investigation_id),
+            (
+                status,
+                ENDED_BECAUSE.get(status),
+                lease.attempt_id,
+                lease.epoch,
+                expires_in,
+                lease.investigation_id,
+            ),
         )
 
 

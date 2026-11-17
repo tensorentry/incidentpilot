@@ -13,7 +13,7 @@ from incidentpilot.persistence.events import list_events
 from incidentpilot.persistence.fence import StaleLease, fenced_transaction
 from incidentpilot.workflows.claim import claim_next
 from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase
-from tests.integration.seeding import seed, start_request
+from tests.integration.seeding import ENDED_BECAUSE, seed, start_request
 
 OFFLINE = RunMode.OFFLINE_DEMO
 
@@ -101,7 +101,10 @@ async def test_ended_work_cannot_be_cancelled(
     async with database.runtime() as connection:
         investigation_id = await queued(connection)
         async with owner_transaction(connection, OWNER_A):
-            await connection.execute("UPDATE investigations SET status = %s", (status,))
+            await connection.execute(
+                "UPDATE investigations SET status = %s, termination_reason = %s",
+                (status, ENDED_BECAUSE.get(status)),
+            )
 
         message = f"investigation {investigation_id} has already ended: {status}"
         with pytest.raises(Conflict, match=rf"^{re.escape(message)}$"):
