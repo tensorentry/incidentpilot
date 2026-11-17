@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := check
 .PHONY: sync lock-check format lint types test check mutate fixtures \
-	infra-up infra-down migrate import-snapshots test-integration
+	infra-up infra-down migrate import-snapshots test-integration demo
 
 UV_RUN := uv run --frozen
 COMPOSE := docker compose -f docker-compose.yml -f docker-compose.dev.yml
@@ -49,3 +49,7 @@ import-snapshots:
 
 test-integration:
 	$(UV_RUN) pytest tests/integration
+
+# Kills a worker mid-call and shows another recovering its investigation (needs migrate).
+demo:
+	$(UV_RUN) python scripts/kill_restart_demo.py

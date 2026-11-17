@@ -8,7 +8,9 @@ another, and prints JSON.
 import argparse
 import asyncio
 import json
-from collections.abc import Mapping, Sequence
+import os
+from collections.abc import Callable, Mapping, Sequence
+from datetime import timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -33,6 +35,8 @@ from incidentpilot.persistence.investigations import get_investigation
 from incidentpilot.persistence.isolation import LOCAL_OWNER_ID
 from incidentpilot.persistence.snapshots import SnapshotError
 from incidentpilot.settings import ConfigurationError, Settings, load_settings
+from incidentpilot.workflows.claim import LEASE
+from incidentpilot.workflows.offline import Shift, offline_worker
 
 PROFILE = "single-investigator-default"
 
@@ -68,7 +72,29 @@ def build_parser() -> argparse.ArgumentParser:
 
     cancel = commands.add_parser("cancel-investigation", help="stop queued or running work")
     cancel.add_argument("investigation_id", type=UUID)
+
+    worker = commands.add_parser("worker", help="run offline_demo investigations")
+    worker.add_argument("--worker-id", default=f"worker-{os.getpid()}")
+    worker.add_argument("--jobs", type=positive(int), help="stop after this many; default: never")
+    worker.add_argument("--lease-seconds", type=positive(float), default=LEASE.total_seconds())
+    worker.add_argument(
+        "--provider-delay",
+        type=float,
+        default=0.0,
+        help="seconds the scripted provider takes to answer each request",
+    )
     return parser
+
+
+def positive[N: (int, float)](kind: type[N]) -> Callable[[str], N]:
+    def convert(text: str) -> N:
+        value = kind(text)
+        if value <= 0:
+            raise argparse.ArgumentTypeError(f"must be positive: {text}")
+        return value
+
+    convert.__name__ = kind.__name__
+    return convert
 
 
 def parse[T: BaseModel](model: type[T], fields: Mapping[str, object]) -> T:
@@ -162,10 +188,30 @@ async def show(connection: Connection, owner: OwnerId, investigation_id: Investi
     }
 
 
-async def run(settings: Settings, arguments: argparse.Namespace) -> Output:
-    connection = await connect_runtime(
-        required(settings.database_url, "INCIDENTPILOT_DATABASE_URL")
+async def work(conninfo: str, settings: Settings, arguments: argparse.Namespace) -> Output:
+    """Run a worker until `--jobs` investigations have ended, or until it is killed."""
+    if settings.mode is not RunMode.OFFLINE_DEMO:
+        raise RequestError("only offline_demo has a worker until the live investigator (T4.7)")
+    shift = Shift(arguments.jobs)
+    worker = offline_worker(
+        arguments.worker_id,
+        shift,
+        timedelta(seconds=arguments.lease_seconds),
+        timedelta(seconds=arguments.provider_delay),
     )
+    async with (
+        await connect_runtime(conninfo) as connection,
+        await connect_runtime(conninfo) as keeping,
+    ):
+        await worker.run(connection, keeping, shift.stop)
+    return {"worker_id": arguments.worker_id, "jobs": shift.jobs}
+
+
+async def run(settings: Settings, arguments: argparse.Namespace) -> Output:
+    conninfo = required(settings.database_url, "INCIDENTPILOT_DATABASE_URL")
+    if arguments.command == "worker":
+        return await work(conninfo, settings, arguments)
+    connection = await connect_runtime(conninfo)
     async with connection:
         return await execute(connection, settings, arguments)
 

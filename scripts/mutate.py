@@ -27,6 +27,7 @@ COPIED = [
     "tests",
     "docs",
     "scenarios",
+    "scripts",
     "pyproject.toml",
     "MANIFEST.json",
     ".env.example",

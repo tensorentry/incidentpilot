@@ -78,4 +78,12 @@ pytest_add_cli_args_test_selection = ["tests/"]
 # Mutating SQL text only produces syntax errors. Integration tests check what the
 # migrations do instead.
 do_not_mutate = ["src/incidentpilot/persistence/migrations/*"]
-also_copy = ["docs", "scenarios", "MANIFEST.json", ".env.example", "README.md", "LICENSE"]
+also_copy = [
+    "docs",
+    "scenarios",
+    "scripts",
+    "MANIFEST.json",
+    ".env.example",
+    "README.md",
+    "LICENSE",
+]

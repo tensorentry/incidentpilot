@@ -12,15 +12,18 @@ instead, without replaying the script (E1). A script stopped by its budget retur
 no candidate: the application's fallback report arrives in T4.8.
 """
 
+import asyncio
 import logging
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import Enum, auto
 
 from incidentpilot.domain.canonical import sha256_digest
 from incidentpilot.domain.enums import (
     ClaimKind,
     DiagnosticOutcome,
+    EvidenceKind,
     FailureCategory,
     ReportAuthor,
     TerminationReason,
@@ -122,6 +125,32 @@ def abstain(evidence: Sequence[EvidenceRecord]) -> ReportCandidate:
     )
 
 
+# The script `incidentpilot worker` plays. Its evidence is written into the script, not
+# read from the snapshot: the telemetry adapter that reads snapshots arrives in T4.2.
+_DEMO_LOGS = [
+    EvidenceDraft(
+        kind=EvidenceKind.LOG_RECORD,
+        source_ref=f"log/checkout-api/demo-{n}",
+        adapter_version="scripted-1",
+        window=None,
+        content={"service": "checkout-api", "message": message},
+    )
+    for n, message in enumerate(
+        [
+            "upstream timeout calling payments-api",
+            "retrying payments-api request",
+            "payments-api pool exhausted",
+        ],
+        1,
+    )
+]
+DEMO_SCRIPT = (
+    Step(30_000, Usage(1_200, 150, 21_000), tuple(_DEMO_LOGS[:2])),
+    Step(30_000, Usage(1_500, 180, 25_500), tuple(_DEMO_LOGS[2:])),
+    Step(30_000, Usage(1_800, 400, 33_000)),
+)
+
+
 @dataclass
 class ScriptedModel:
     """A worker Job that plays a script. Each planted fault strikes once per instance,
@@ -130,6 +159,8 @@ class ScriptedModel:
     script: Sequence[Step]
     faults: Mapping[int, Fault] = field(default_factory=dict)
     finish: Finish = abstain
+    # How long the fake provider takes to answer, so a demo can catch a call in flight.
+    provider_delay: timedelta = timedelta(0)
     _struck: set[int] = field(default_factory=set, init=False)
 
     async def __call__(self, connection: Connection, lease: Lease, keeper: LeaseKeeper) -> None:
@@ -176,7 +207,7 @@ class ScriptedModel:
             await dispatch_call(connection, lease, call_id)
         self._strike(index, Fault.CRASH_AFTER_DISPATCH)
         try:
-            usage = self._send(index, step)
+            usage = await self._send(index, step)
         except ProviderError:
             async with fenced_transaction(connection, lease):
                 await fail_call(connection, lease, call_id, FailureCategory.PROVIDER_ERROR)
@@ -186,9 +217,10 @@ class ScriptedModel:
             for draft in step.evidence:
                 await commit_evidence(connection, lease, draft)
 
-    def _send(self, index: int, step: Step) -> Usage:
-        """The fake provider: it answers with the step's usage."""
+    async def _send(self, index: int, step: Step) -> Usage:
+        """The fake provider: it answers with the step's usage after `provider_delay`."""
         self._strike(index, Fault.PROVIDER_ERROR)
+        await asyncio.sleep(self.provider_delay.total_seconds())
         return step.usage
 
     def _strike(self, index: int, fault: Fault) -> None:
