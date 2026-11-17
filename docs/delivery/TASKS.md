@@ -57,7 +57,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | T3.5 | Start-investigation, event append, admission lock | done | [T3.5](tasks/T3.5.md) |
 | T3.6 | Fence primitive | done | [T3.6](tasks/T3.6.md) |
 | T3.7 | CLI over application services | done | [T3.7](tasks/T3.7.md) |
-| T3.8 | Attempts, capacity slots, claim transaction | todo | |
+| T3.8 | Attempts, capacity slots, claim transaction | done | [T3.8](tasks/T3.8.md) |
 | T3.9 | Worker loop and lease renewal | todo | |
 | T3.10 | Sweeper, `LOST`, recovery, shared terminal transition | todo | |
 | T3.11 | Scripted fake model with real fenced writes | todo | |

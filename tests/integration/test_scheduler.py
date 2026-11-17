@@ -7,7 +7,12 @@ from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase
 from tests.integration.seeding import seed, start_request
 
 # Adding a function here needs an erratum (E19).
-SCHEDULER_FUNCTIONS = {"queued_investigation_count"}
+SCHEDULER_FUNCTIONS = {
+    "queued_investigation_count",
+    "claimable_investigation",
+    "bind_capacity_slot",
+    "release_capacity_slot",
+}
 
 
 async def test_the_queued_count_sees_every_owner(database: ScratchDatabase) -> None:
@@ -52,7 +57,12 @@ async def test_scheduler_functions_are_definers_with_a_pinned_path(
             "incidentpilot_scheduler",
         )
         # IDs and counts only, never tenant content.
-        assert result in {"bigint", "uuid", "SETOF uuid"}
+        assert result in {
+            "bigint",
+            "boolean",
+            "smallint",
+            "TABLE(owner_id uuid, investigation_id uuid)",
+        }
         assert (runtime_may, public_may) == (True, False)
 
 
