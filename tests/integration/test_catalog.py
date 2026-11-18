@@ -1,8 +1,17 @@
-"""Every tenant table is under owner isolation (erratum E19).
+"""The catalog check: the schema keeps every owner's rows apart (erratum E19).
 
 Only the owners table, the installation-wide capacity slots and Alembic's own table
-are exempt. T3.14 widens this into the
-full catalog check: keys, foreign keys, roles and definer functions.
+are exempt. Every other table needs:
+- a non-null owner;
+- forced row-level security with the one owner policy;
+- unique keys and foreign keys that include the owner.
+
+Beyond the tables:
+- no grant lets the runtime act on rows it can't see;
+- nothing is created outside `public` where these checks wouldn't look;
+- views run with the caller's rights.
+
+The scheduler's definer functions are checked in test_scheduler.py.
 """
 
 import re
@@ -21,10 +30,21 @@ from incidentpilot.domain.enums import (
     RunMode,
     TerminationReason,
 )
+from incidentpilot.persistence.database import Connection
 from tests.integration.harness import ScratchDatabase
 
 # E19: only these have no owner column. Capacity slots are installation-wide.
 EXEMPT = {"alembic_version", "owners", "capacity_slots"}
+OWNED = "(owner_id = current_owner_id())"
+RUNTIME = "incidentpilot_runtime"
+
+
+async def tenant_tables(connection: Connection) -> set[str]:
+    cursor = await connection.execute(
+        "SELECT relname FROM pg_catalog.pg_class"
+        " WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p')"
+    )
+    return {name for (name,) in await cursor.fetchall()} - EXEMPT
 
 
 async def test_every_other_table_is_isolated_by_owner(database: ScratchDatabase) -> None:
@@ -47,6 +67,155 @@ async def test_every_other_table_is_isolated_by_owner(database: ScratchDatabase)
     assert set(tables) >= EXEMPT
     for name in set(tables) - EXEMPT:
         assert tables[name] == [True, ["owner_isolation"], True], name
+
+
+async def test_each_owner_policy_applies_to_every_command_and_role(
+    database: ScratchDatabase,
+) -> None:
+    async with database.migrator() as connection:
+        cursor = await connection.execute(
+            """
+            SELECT polrelid::regclass::text, polname, polcmd, polpermissive, polroles,
+                   pg_catalog.pg_get_expr(polqual, polrelid),
+                   pg_catalog.pg_get_expr(polwithcheck, polrelid)
+            FROM pg_catalog.pg_policy
+            """
+        )
+        policies = await cursor.fetchall()
+
+    assert policies
+    for table, *policy in policies:
+        # Every command, permissive, for PUBLIC (role 0), reading and writing the owner.
+        assert policy == ["owner_isolation", "*", True, [0], OWNED, OWNED], table
+
+
+async def test_the_current_owner_comes_only_from_the_transaction_setting(
+    database: ScratchDatabase,
+) -> None:
+    async with database.migrator() as connection:
+        cursor = await connection.execute(
+            """
+            SELECT prosecdef, provolatile, proconfig, pg_catalog.pg_get_userbyid(proowner),
+                   pg_catalog.pg_get_function_sqlbody(oid)
+            FROM pg_catalog.pg_proc WHERE oid = 'current_owner_id'::regproc
+            """
+        )
+        row = await cursor.fetchone()
+
+    assert row == (
+        False,
+        "s",
+        None,
+        "incidentpilot_migrator",
+        "RETURN (NULLIF(current_setting('app.owner_id'::text, true), ''::text))::uuid",
+    )
+
+
+async def test_every_foreign_key_between_tenant_tables_carries_the_owner(
+    database: ScratchDatabase,
+) -> None:
+    # (owner_id, x) -> (owner_id, id) makes a reference to another owner's row
+    # impossible, whatever the IDs.
+    async with database.migrator() as connection:
+        cursor = await connection.execute(
+            """
+            SELECT conrelid::regclass::text, conname, confrelid::regclass::text,
+                   (SELECT array_agg(attname ORDER BY position)
+                    FROM unnest(conkey) WITH ORDINALITY AS key (number, position)
+                    JOIN pg_catalog.pg_attribute
+                      ON attrelid = conrelid AND attnum = key.number),
+                   (SELECT array_agg(attname ORDER BY position)
+                    FROM unnest(confkey) WITH ORDINALITY AS key (number, position)
+                    JOIN pg_catalog.pg_attribute
+                      ON attrelid = confrelid AND attnum = key.number)
+            FROM pg_catalog.pg_constraint
+            WHERE contype = 'f' AND connamespace = 'public'::regnamespace
+            """
+        )
+        keys = await cursor.fetchall()
+        tables = await tenant_tables(connection)
+
+    tenant_keys = [key for key in keys if key[0] not in EXEMPT]
+    # Every tenant table names a real owner.
+    assert {table for table, _, parent, *_ in tenant_keys if parent == "owners"} == tables
+    for _, name, parent, columns, parent_columns in tenant_keys:
+        if parent == "owners":
+            assert (columns, parent_columns) == (["owner_id"], ["id"]), name
+        else:
+            assert parent not in EXEMPT, name
+            assert (columns[0], parent_columns[0]) == ("owner_id", "owner_id"), name
+            assert parent_columns[1:] == ["id"], name
+
+
+async def test_the_runtime_holds_no_grant_that_skips_row_security(
+    database: ScratchDatabase,
+) -> None:
+    # TRUNCATE ignores row-level security, REFERENCES lets a role probe for rows through
+    # its own foreign keys, and TRIGGER runs code on rows it can't see.
+    async with database.migrator() as connection:
+        cursor = await connection.execute(
+            """
+            SELECT table_.relname, grant_.privilege_type
+            FROM pg_catalog.pg_class AS table_, pg_catalog.aclexplode(table_.relacl) AS grant_
+            WHERE table_.relnamespace = 'public'::regnamespace
+              AND grant_.grantee = %s::regrole
+              AND grant_.privilege_type IN ('TRUNCATE', 'REFERENCES', 'TRIGGER')
+            UNION ALL
+            SELECT table_.relname || '.' || column_.attname, grant_.privilege_type
+            FROM pg_catalog.pg_class AS table_
+            JOIN pg_catalog.pg_attribute AS column_ ON column_.attrelid = table_.oid,
+                 pg_catalog.aclexplode(column_.attacl) AS grant_
+            WHERE table_.relnamespace = 'public'::regnamespace
+              AND grant_.grantee = %s::regrole
+              AND grant_.privilege_type = 'REFERENCES'
+            """,
+            (RUNTIME, RUNTIME),
+        )
+        assert await cursor.fetchall() == []
+
+
+async def test_nothing_is_granted_to_public(database: ScratchDatabase) -> None:
+    async with database.migrator() as connection:
+        cursor = await connection.execute(
+            """
+            SELECT table_.relname, grant_.privilege_type
+            FROM pg_catalog.pg_class AS table_, pg_catalog.aclexplode(table_.relacl) AS grant_
+            WHERE table_.relnamespace = 'public'::regnamespace AND grant_.grantee = 0
+            UNION ALL
+            SELECT table_.relname || '.' || column_.attname, grant_.privilege_type
+            FROM pg_catalog.pg_class AS table_
+            JOIN pg_catalog.pg_attribute AS column_ ON column_.attrelid = table_.oid,
+                 pg_catalog.aclexplode(column_.attacl) AS grant_
+            WHERE table_.relnamespace = 'public'::regnamespace AND grant_.grantee = 0
+            """
+        )
+        assert await cursor.fetchall() == []
+
+
+async def test_nothing_lives_outside_the_checked_schema(database: ScratchDatabase) -> None:
+    async with database.migrator() as connection:
+        cursor = await connection.execute(
+            "SELECT nspname FROM pg_catalog.pg_namespace"
+            " WHERE nspname NOT LIKE 'pg\\_%%' AND nspname <> 'information_schema'"
+        )
+        assert await cursor.fetchall() == [("public",)]
+
+
+async def test_views_run_with_the_callers_rights(database: ScratchDatabase) -> None:
+    # A plain view runs with its creator's rights and would skip the owner policy, and a
+    # materialized view keeps rows outside the policy altogether.
+    async with database.migrator() as connection:
+        cursor = await connection.execute(
+            """
+            SELECT relname, relkind, coalesce(reloptions, '{}')
+            FROM pg_catalog.pg_class
+            WHERE relnamespace = 'public'::regnamespace AND relkind IN ('v', 'm')
+            """
+        )
+        views = await cursor.fetchall()
+
+    for name, kind, options in views:
+        assert (kind, "security_invoker=true" in options) == ("v", True), name
 
 
 async def test_every_unique_key_on_a_tenant_table_includes_the_owner(
