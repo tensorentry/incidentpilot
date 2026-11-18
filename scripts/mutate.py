@@ -15,7 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +43,8 @@ TABLES: dict[str, Mapping[Any, frozenset[Any]]] = {
     "TOOL_CALL_TRANSITIONS": transitions.TOOL_CALL_TRANSITIONS,
 }
 TESTS_FAILED = 1
+# Fast tests first: with -x, a mutation the unit tests catch never waits on PostgreSQL.
+ALL_TESTS = ("tests/unit", "tests/sdk_compat", "tests/integration")
 SWAPPED_COMPARISONS: dict[type[ast.cmpop], type[ast.cmpop]] = {
     ast.Lt: ast.LtE,
     ast.LtE: ast.Lt,
@@ -83,11 +85,11 @@ def run_mutmut() -> tuple[int, list[str]]:
     return len(mutmut_results(mutmut, "--all", "true")), mutmut_results(mutmut)
 
 
-def pytest_exit_code(copy: Path, tests: str = "tests/unit/domain") -> int:
+def pytest_exit_code(copy: Path, tests: Sequence[str] = ("tests/unit/domain",)) -> int:
     for cache in copy.rglob("__pycache__"):
         shutil.rmtree(cache, ignore_errors=True)
     return subprocess.run(
-        [sys.executable, "-m", "pytest", tests, "-q", "-x", "-p", "no:cacheprovider"],
+        [sys.executable, "-m", "pytest", *tests, "-q", "-x", "-p", "no:cacheprovider"],
         cwd=copy,
         env={**ENVIRONMENT, "PYTHONPATH": str(copy / "src")},
         capture_output=True,
@@ -191,7 +193,7 @@ def check_decorated(copy: Path) -> tuple[int, list[str]]:
         original = (copy / file).read_text()
         (copy / file).write_text(text)
         total += 1
-        if pytest_exit_code(copy, "tests") != TESTS_FAILED:
+        if pytest_exit_code(copy, ALL_TESTS) != TESTS_FAILED:
             unnoticed.append(name)
         (copy / file).write_text(original)
     return total, unnoticed
@@ -213,6 +215,14 @@ def check_mutations(
 
 
 def main() -> int:
+    suites = {
+        f"tests/{path.name}"
+        for path in (ROOT / "tests").iterdir()
+        if path.is_dir() and any(path.rglob("test_*.py"))
+    }
+    if suites != set(ALL_TESTS):
+        print(f"ABORT: ALL_TESTS lists {sorted(ALL_TESTS)} but the suites are {sorted(suites)}")
+        return 2
     try:
         total, survivors = run_mutmut()
     except subprocess.CalledProcessError:
@@ -234,7 +244,7 @@ def main() -> int:
         transitions_text = (copy / TRANSITIONS_FILE).read_text()
         enums_text = (copy / ENUMS_FILE).read_text()
 
-        if pytest_exit_code(copy) != 0 or pytest_exit_code(copy, "tests") != 0:
+        if pytest_exit_code(copy) != 0 or pytest_exit_code(copy, ALL_TESTS) != 0:
             print("ABORT: tests are already failing, so mutation results would mean nothing")
             return 2
         table = transitions.ATTEMPT_TRANSITIONS
