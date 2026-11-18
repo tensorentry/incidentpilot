@@ -33,7 +33,16 @@ async def test_the_queued_count_sees_every_owner(database: ScratchDatabase) -> N
         assert await cursor.fetchone() == (3,)
 
 
-async def test_scheduler_functions_are_definers_with_a_pinned_path(
+async def test_the_scheduler_owns_no_tables(database: ScratchDatabase) -> None:
+    async with database.migrator() as connection:
+        cursor = await connection.execute(
+            "SELECT relname FROM pg_catalog.pg_class"
+            " WHERE relowner = 'incidentpilot_scheduler'::regrole"
+        )
+        assert await cursor.fetchall() == []
+
+
+async def test_the_only_definers_are_the_scheduler_functions_with_a_pinned_path(
     database: ScratchDatabase,
 ) -> None:
     async with database.migrator() as connection:
@@ -45,7 +54,7 @@ async def test_scheduler_functions_are_definers_with_a_pinned_path(
                    EXISTS (SELECT FROM pg_catalog.aclexplode(proacl) WHERE grantee = 0)
             FROM pg_catalog.pg_proc
             WHERE pronamespace = 'public'::regnamespace
-              AND proowner = 'incidentpilot_scheduler'::regrole
+              AND (prosecdef OR proowner = 'incidentpilot_scheduler'::regrole)
             """
         )
         rows = await cursor.fetchall()

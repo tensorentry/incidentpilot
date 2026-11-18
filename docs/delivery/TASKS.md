@@ -63,7 +63,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | T3.11 | Scripted fake model with real fenced writes | done | [T3.11](tasks/T3.11.md) |
 | T3.12 | Atomic terminal publication | done | [T3.12](tasks/T3.12.md) |
 | T3.13 | Kill/restart demo | done | [T3.13](tasks/T3.13.md) |
-| T3.14 | Cross-owner isolation suite and catalog check (E19) | todo | |
+| T3.14 | Cross-owner isolation suite and catalog check (E19) | done | [T3.14](tasks/T3.14.md) |
 
 ## M4 — First live agent (IP3-005/006/007)
 
