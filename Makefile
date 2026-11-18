@@ -23,7 +23,7 @@ types:
 	$(UV_RUN) mypy
 
 test:
-	$(UV_RUN) pytest tests/unit
+	$(UV_RUN) pytest tests/unit tests/sdk_compat
 
 check: lock-check lint types test
 
