@@ -1,6 +1,6 @@
 # IncidentPilot v3 spec errata
 
-**Status:** E1–E17 accepted 2026-11-05 (T0.5). E18 accepted 2026-11-08 (T1.3). E19 accepted 2026-11-10 (T0.7).
+**Status:** E1–E17 accepted 2026-11-05 (T0.5). E18 accepted 2026-11-08 (T1.3). E19 accepted 2026-11-10 (T0.7). E20 accepted 2026-11-20 (T4.4).
 
 The design spec is frozen and its hash is pinned in `MANIFEST.json`, so corrections live here. **Where this file and the spec disagree, this file wins.** Each entry names the spec text it changes.
 
@@ -27,6 +27,7 @@ Entries marked ⚖️ are judgment calls where the spec gave no clear answer. Th
 | E17 | Fallback validation | Fallbacks pass through validation; D06 is authoritative | T4.8 |
 | E18 ⚖️ | Tool-call states | Tool calls get a state like model calls; sent calls keep their reservation | T1.3 |
 | E19 ⚖️ | Owner isolation | Every tenant row has an owner, and PostgreSQL enforces it | T1.4 |
+| E20 ⚖️ | Trace tool arguments | `get_trace_summary` pages summaries; it takes no trace IDs | T4.4 |
 
 ---
 
@@ -349,3 +350,13 @@ Each change has one effect on the reservation:
 - Fixtures stored once per owner.
 - A second access path for the scheduler, in the most delicate code, which needs its own race tests.
 - T3.1 grows, and M3 gains one task, T3.14.
+
+## E20. Trace tool arguments ⚖️
+
+**Changes:** §8.1 (`get_trace_summary` row), E16
+
+**Problem:** §8.1 gives `get_trace_summary` an argument of "allowed trace IDs". E15 made a span summary the unit of trace evidence: one operation's latency split by downstream call over a window. A summary has no trace ID, and the fixtures hold no individual traces. Nothing gives the model a trace ID to ask for, and nothing defines which IDs are allowed.
+
+**Decision:** `get_trace_summary` takes the service, the window, a limit and a cursor, like `get_deployments`. It returns the summaries of that service's operations that overlap the window, with coverage counting only the time the summaries span. A trace ID argument returns with real traces (IP3-015), together with a rule for which IDs an investigation may name.
+
+**Why this call:** an argument that no source can honour would either be ignored, which misleads the model, or refused every time. **Cost:** the model can't narrow to one trace. With summaries per operation, there is nothing finer to narrow to.
