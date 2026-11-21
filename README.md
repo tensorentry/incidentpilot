@@ -2,7 +2,7 @@
 
 A local-first lab for evidence-linked investigation of simulated service incidents, using one bounded AI investigator. It's a learning and engineering showcase, not a production incident tool.
 
-**Status:** early implementation. The toolchain, settings and core domain types exist. PostgreSQL, its roles and the snapshot registry exist. A worker runs investigations end to end with a scripted stand-in for the model, and recovers from crashes. The agent SDK is pinned and its behaviour checked offline. A tool gateway commits evidence before the model can see it, behind all five read-only telemetry tools. There's no live agent yet, and no benchmark has been run. See [`docs/delivery/TASKS.md`](docs/delivery/TASKS.md).
+**Status:** early implementation. The toolchain, settings and core domain types exist. PostgreSQL, its roles and the snapshot registry exist. A worker runs investigations end to end with a scripted stand-in for the model, and recovers from crashes. The agent SDK is pinned and its behaviour checked offline. A tool gateway commits evidence before the model can see it, behind all five read-only telemetry tools, and a call gate reserves every model request against the budget before it is sent. There's no live agent yet, and no benchmark has been run. See [`docs/delivery/TASKS.md`](docs/delivery/TASKS.md).
 
 ## Design documents
 
