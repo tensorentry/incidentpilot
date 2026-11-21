@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from incidentpilot.domain.enums import InvestigationStatus, RunMode
+from incidentpilot.domain.enums import InvestigationStatus, RunMode, ToolName
 from incidentpilot.domain.ids import IncidentId, InvestigationId
 from incidentpilot.domain.investigation import (
     FrozenConfig,
@@ -68,6 +68,14 @@ async def insert_investigation(
             limits.spend_cap_micro_usd,
             config.digest,
         ),
+    )
+    # E13: every tool's quota starts with the investigation.
+    await connection.execute(
+        """
+        INSERT INTO investigation_tool_quota (owner_id, investigation_id, tool_name, cap)
+        SELECT current_owner_id(), %s, tool, %s FROM unnest(%s::text[]) AS tool
+        """,
+        (investigation_id, limits.calls_per_tool, [tool.value for tool in ToolName]),
     )
 
 

@@ -29,6 +29,10 @@ from incidentpilot.domain.enums import (
     ReportAuthor,
     RunMode,
     TerminationReason,
+    ToolCallState,
+    ToolErrorCode,
+    ToolName,
+    ToolStatus,
 )
 from incidentpilot.persistence.database import Connection
 from tests.integration.harness import ScratchDatabase
@@ -114,8 +118,8 @@ async def test_the_current_owner_comes_only_from_the_transaction_setting(
 async def test_every_foreign_key_between_tenant_tables_carries_the_owner(
     database: ScratchDatabase,
 ) -> None:
-    # (owner_id, x) -> (owner_id, id) makes a reference to another owner's row
-    # impossible, whatever the IDs.
+    # (owner_id, x, ...) -> the parent's primary key (owner_id, ...) makes a reference
+    # to another owner's row impossible, whatever the IDs.
     async with database.migrator() as connection:
         cursor = await connection.execute(
             """
@@ -127,8 +131,14 @@ async def test_every_foreign_key_between_tenant_tables_carries_the_owner(
                    (SELECT array_agg(attname ORDER BY position)
                     FROM unnest(confkey) WITH ORDINALITY AS key (number, position)
                     JOIN pg_catalog.pg_attribute
-                      ON attrelid = confrelid AND attnum = key.number)
-            FROM pg_catalog.pg_constraint
+                      ON attrelid = confrelid AND attnum = key.number),
+                   (SELECT array_agg(attname ORDER BY position)
+                    FROM pg_catalog.pg_constraint AS primary_
+                    CROSS JOIN unnest(primary_.conkey) WITH ORDINALITY AS key (number, position)
+                    JOIN pg_catalog.pg_attribute
+                      ON attrelid = primary_.conrelid AND attnum = key.number
+                    WHERE primary_.conrelid = foreign_.confrelid AND primary_.contype = 'p')
+            FROM pg_catalog.pg_constraint AS foreign_
             WHERE contype = 'f' AND connamespace = 'public'::regnamespace
             """
         )
@@ -138,13 +148,13 @@ async def test_every_foreign_key_between_tenant_tables_carries_the_owner(
     tenant_keys = [key for key in keys if key[0] not in EXEMPT]
     # Every tenant table names a real owner.
     assert {table for table, _, parent, *_ in tenant_keys if parent == "owners"} == tables
-    for _, name, parent, columns, parent_columns in tenant_keys:
+    for _, name, parent, columns, parent_columns, primary in tenant_keys:
         if parent == "owners":
             assert (columns, parent_columns) == (["owner_id"], ["id"]), name
         else:
             assert parent not in EXEMPT, name
             assert (columns[0], parent_columns[0]) == ("owner_id", "owner_id"), name
-            assert parent_columns[1:] == ["id"], name
+            assert parent_columns == primary, name
 
 
 async def test_the_runtime_holds_no_grant_that_skips_row_security(
@@ -258,6 +268,10 @@ async def test_every_unique_key_on_a_tenant_table_includes_the_owner(
         ("report_candidates", "author", {a.value for a in ReportAuthor}),
         ("report_candidates", "termination_reason", {r.value for r in TerminationReason}),
         ("diagnosis_reports", "diagnostic_outcome", {o.value for o in DiagnosticOutcome}),
+        ("investigation_tool_quota", "tool_name", {t.value for t in ToolName}),
+        ("tool_calls", "state", {s.value for s in ToolCallState}),
+        ("tool_calls", "result_status", {s.value for s in ToolStatus}),
+        ("tool_calls", "error_code", {c.value for c in ToolErrorCode}),
     ],
 )
 async def test_each_stored_vocabulary_matches_its_enum(

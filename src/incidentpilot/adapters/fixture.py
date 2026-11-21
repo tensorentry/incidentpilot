@@ -69,6 +69,10 @@ class FixtureTelemetry:
         self._manifest = bundle.manifest
 
     @property
+    def adapter(self) -> str:
+        return "fixture"
+
+    @property
     def adapter_version(self) -> str:
         return self._manifest.adapter_version
 

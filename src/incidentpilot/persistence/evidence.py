@@ -63,6 +63,8 @@ class Committed:
     stored: bool
     # False when this investigation could already see it, such as after a recovery.
     granted: bool
+    # The sanitized content that was stored, which is all a model may be shown.
+    content: dict[str, JsonValue]
 
 
 def sanitize_content(value: JsonValue) -> JsonValue:
@@ -122,7 +124,7 @@ async def commit_evidence(connection: Connection, lease: Lease, draft: EvidenceD
             EventType.EVIDENCE_COMMITTED,
             {"evidence_id": str(evidence_id), "kind": draft.kind.value, "reused": not stored},
         )
-    return Committed(evidence_id, stored, granted.rowcount == 1)
+    return Committed(evidence_id, stored, granted.rowcount == 1, content)
 
 
 async def visible_evidence(

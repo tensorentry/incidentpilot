@@ -98,6 +98,9 @@ class TelemetryProvider(Protocol):
     """A read-only telemetry source bound to one snapshot."""
 
     @property
+    def adapter(self) -> str: ...
+
+    @property
     def adapter_version(self) -> str: ...
 
     async def get_metrics(self, query: MetricsQuery) -> SourceResult: ...
