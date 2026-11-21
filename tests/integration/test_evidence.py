@@ -132,12 +132,12 @@ async def test_secrets_are_redacted_before_hashing(database: ScratchDatabase) ->
     )
     async with database.runtime() as connection:
         lease = await claimed(connection)
-        await commit(connection, lease, draft)
+        committed = await commit(connection, lease, draft)
         async with owner_transaction(connection, OWNER_A):
             (record,) = await visible_evidence(connection, lease.investigation_id)
 
     clean: dict[str, JsonValue] = {"message": f"key {REDACTED}", REDACTED: [REDACTED, 1]}
-    assert record.content == clean
+    assert record.content == committed.content == clean
     assert record.source_ref == f"log/{REDACTED}"
     assert record.content_sha256 == sha256_digest(clean)
 
@@ -148,7 +148,9 @@ async def test_committing_the_same_record_again_changes_nothing(database: Scratc
         first = await commit(connection, lease, log())
         again = await commit(connection, lease, log())
 
-        assert again == Committed(first.evidence_id, stored=False, granted=False)
+        assert again == Committed(
+            first.evidence_id, stored=False, granted=False, content=first.content
+        )
         assert len(await grants(connection, lease)) == 1
         assert len(await committed_events(connection, lease)) == 1
 
@@ -171,7 +173,9 @@ async def test_a_recovery_attempt_reuses_what_the_lost_one_committed(
         assert retry is not None
 
         again = await commit(connection, retry, log())
-        assert again == Committed(first.evidence_id, stored=False, granted=False)
+        assert again == Committed(
+            first.evidence_id, stored=False, granted=False, content=first.content
+        )
         # Visibility remembers the attempt that first committed it.
         assert await grants(connection, retry) == [
             (first.evidence_id, lease.attempt_id, "tool_result")
@@ -185,7 +189,9 @@ async def test_investigations_of_one_snapshot_share_a_row(database: ScratchDatab
         first = await commit(connection, lease, log())
         shared = await commit(connection, other, log())
 
-        assert shared == Committed(first.evidence_id, stored=False, granted=True)
+        assert shared == Committed(
+            first.evidence_id, stored=False, granted=True, content=first.content
+        )
         assert await committed_events(connection, other) == [
             {"evidence_id": str(first.evidence_id), "kind": "log_record", "reused": True}
         ]

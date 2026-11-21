@@ -72,7 +72,9 @@ FROM report_candidates WHERE id = %s AND investigation_id = %s
 _INVESTIGATION = """
 SELECT status, snapshot_id, config_sha256, mode, attempts_started, repair_requests_used,
        model_requests_settled, model_requests_unknown, input_tokens_actual,
-       output_tokens_actual
+       output_tokens_actual,
+       (SELECT count(*) FROM tool_calls
+        WHERE tool_calls.investigation_id = investigations.id AND state = 'COMPLETED')
 FROM investigations WHERE id = %s
 """
 _INSERT_REPORT = """
@@ -176,8 +178,7 @@ async def publish_report(
             usage=UsageSummary(
                 model_requests_settled=investigation[6],
                 model_requests_unknown=investigation[7],
-                # Tool calls arrive with the gateway (T4.3).
-                tool_calls_completed=0,
+                tool_calls_completed=investigation[10],
                 input_tokens=investigation[8],
                 output_tokens=investigation[9],
             ),

@@ -81,6 +81,10 @@ pytest_add_cli_args_test_selection = ["tests/"]
 # Mutating SQL text only produces syntax errors. Integration tests check what the
 # migrations do instead.
 do_not_mutate = ["src/incidentpilot/persistence/migrations/*"]
+# mutmut times each test without its fixture setup, and the integration fixtures do
+# most of their work there (a full investigation per cross-owner test). Its default
+# allowance of one second turned slow-but-failing runs into timeouts.
+timeout_constant = 10.0
 also_copy = [
     "docs",
     "scenarios",

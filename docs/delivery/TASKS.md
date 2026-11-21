@@ -71,7 +71,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 |---|---|---|---|
 | T4.1 | Remaining SDK compatibility checks | done | [T4.1](tasks/T4.1.md) |
 | T4.2 | Fixture telemetry adapter | done | [T4.2](tasks/T4.2.md) |
-| T4.3 | Gateway with evidence-before-exposure, one tool | todo | |
+| T4.3 | Gateway with evidence-before-exposure, one tool | done | [T4.3](tasks/T4.3.md) |
 | T4.4 | Remaining four tools | todo | |
 | T4.5 | Provider call gate with minimal ledger | todo | |
 | T4.6 | Bounded briefing builder | todo | |

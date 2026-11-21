@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from psycopg import errors, sql
 
+from incidentpilot.application.investigations import cancel_investigation
 from incidentpilot.domain.enums import ReportAuthor, TerminationReason
 from incidentpilot.domain.ids import OwnerId
 from incidentpilot.persistence.database import Connection, owner_transaction
@@ -32,6 +33,7 @@ from incidentpilot.workflows.scripted import (
 from incidentpilot.workflows.worker import Worker
 from tests.integration.harness import OWNER_A, OWNER_B, ScratchDatabase
 from tests.integration.seeding import OFFLINE, claimed, queue
+from tests.integration.test_gateway import ask_metrics, gateway, metrics_query
 
 # Every table but the exempt ones. A new tenant table must be added here, and its rows
 # must come out of a full investigation.
@@ -42,11 +44,14 @@ TENANT_TABLES = [
     "idempotency_requests",
     "incidents",
     "investigation_evidence",
+    "investigation_tool_quota",
     "investigations",
     "model_calls",
     "report_candidates",
     "run_events",
     "snapshots",
+    "tool_calls",
+    "tool_evidence",
 ]
 # Capacity slots hold the bound attempt's owner, but they are installation-wide, and the
 # runtime has no grant on them.
@@ -56,12 +61,19 @@ POLICY_VIOLATION = r"^new row violates row-level security policy for table "
 
 @pytest.fixture
 async def both(database: ScratchDatabase) -> ScratchDatabase:
-    """Each owner has run one investigation through to its published report."""
+    """Each owner has run one investigation through to its published report, and made
+    one tool call in another."""
     async with database.runtime() as connection, database.runtime() as keeping:
         for owner, tag in [(OWNER_A, "full-a"), (OWNER_B, "full-b")]:
             await queue(connection, owner, tag=tag)
             worker = Worker("w", OFFLINE, ScriptedModel(DEMO_SCRIPT))
             assert await worker.run_once(connection, keeping)
+            lease = await claimed(connection, owner, tag=f"{tag}-tools")
+            tools = await gateway(connection, keeping, lease)
+            response = await ask_metrics(tools, metrics_query())
+            assert response.evidence_refs
+            # Frees its capacity slot for the tests that claim more work.
+            await cancel_investigation(connection, owner, lease.investigation_id)
     return database
 
 
