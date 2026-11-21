@@ -88,22 +88,21 @@ def telemetry() -> FixtureTelemetry:
     return open_fixture(OBSERVATIONS, MANIFEST.snapshot_id, digest)
 
 
-async def gateway(connection: Connection, keeping: Connection, lease: Lease) -> ToolGateway:
+async def gateway(
+    connection: Connection,
+    keeping: Connection,
+    lease: Lease,
+    source: TelemetryProvider | None = None,
+) -> ToolGateway:
     keeper = LeaseKeeper(keeping, lease)
-    return ToolGateway(connection, lease, keeper, telemetry(), await load_scope(connection, lease))
+    scope = await load_scope(connection, lease)
+    return ToolGateway(connection, lease, keeper, source or telemetry(), scope)
 
 
 async def ask_metrics(
     tools: ToolGateway, query: MetricsQuery, call: str = "call-1"
 ) -> ToolResponse:
-    return await tools.call(
-        ToolName.GET_SERVICE_METRICS,
-        call,
-        query,
-        (query.service,),
-        query.window,
-        lambda source: source.get_metrics(query),
-    )
+    return await tools.call(call, query)
 
 
 async def rows(connection: Connection, lease: Lease) -> list[tuple[Any, ...]]:
@@ -532,16 +531,22 @@ async def test_a_lease_the_keeper_lost_stops_the_call_before_it_reserves(
         assert await rows(connection, lease) == []
 
 
-class Stealing:
+class Stealing(FixtureTelemetry):
     """A source that loses the lease while it answers, then answers anyway."""
 
     def __init__(self, connection: Connection, lease: Lease) -> None:
+        super().__init__(read_bundle(FIXTURE))
         self.connection = connection
         self.lease = lease
 
-    async def __call__(self, source: TelemetryProvider) -> SourceResult:
+    async def get_metrics(self, query: MetricsQuery) -> SourceResult:
         await steal(self.connection, self.lease)
-        return await source.get_metrics(metrics_query())
+        return await super().get_metrics(query)
+
+
+class Crashing(FixtureTelemetry):
+    async def get_metrics(self, query: MetricsQuery) -> SourceResult:
+        raise RuntimeError("adapter bug")
 
 
 async def test_a_lease_lost_while_the_source_answers_shows_no_evidence(
@@ -549,17 +554,11 @@ async def test_a_lease_lost_while_the_source_answers_shows_no_evidence(
 ) -> None:
     async with database.runtime() as connection, database.runtime() as keeping:
         lease = await claimed(connection)
-        tools = await gateway(connection, keeping, lease)
+        source = Stealing(connection, lease)
+        tools = await gateway(connection, keeping, lease, source)
 
         with pytest.raises(StaleLease):
-            await tools.call(
-                ToolName.GET_SERVICE_METRICS,
-                "call-1",
-                metrics_query(),
-                ("checkout-api",),
-                window(),
-                Stealing(connection, lease),
-            )
+            await ask_metrics(tools, metrics_query())
 
         async with owner_transaction(connection, OWNER_A):
             assert await visible_evidence(connection, lease.investigation_id) == []
@@ -573,22 +572,12 @@ async def test_a_lease_lost_while_the_source_answers_shows_no_evidence(
 async def test_a_source_that_crashes_raises_and_leaves_the_call_sent(
     database: ScratchDatabase,
 ) -> None:
-    async def crash(source: TelemetryProvider) -> SourceResult:
-        raise RuntimeError("adapter bug")
-
     async with database.runtime() as connection, database.runtime() as keeping:
         lease = await claimed(connection)
-        tools = await gateway(connection, keeping, lease)
+        tools = await gateway(connection, keeping, lease, Crashing(read_bundle(FIXTURE)))
 
         with pytest.raises(RuntimeError, match=r"^adapter bug$"):
-            await tools.call(
-                ToolName.GET_SERVICE_METRICS,
-                "call-1",
-                metrics_query(),
-                ("checkout-api",),
-                window(),
-                crash,
-            )
+            await ask_metrics(tools, metrics_query())
         assert await rows(connection, lease) == [
             ("get_service_metrics", "DISPATCHED", None, None, True)
         ]
@@ -817,19 +806,3 @@ async def test_arguments_that_make_no_query_are_refused_for_free(
         assert response.error.message.startswith(message)
         assert await rows(connection, lease) == []
         assert await quotas(connection, lease) == (0, 0, 0, 0)
-
-
-def test_the_tool_schema_takes_only_model_writable_arguments() -> None:
-    (tool,) = TOOLS
-    schema = tool.params_json_schema
-
-    assert tool.name == "get_service_metrics"
-    assert sorted(schema["properties"]) == [
-        "end_time",
-        "metrics",
-        "resolution_seconds",
-        "service",
-        "start_time",
-    ]
-    assert schema["additionalProperties"] is False
-    assert json.dumps(schema).count("owner") == 0

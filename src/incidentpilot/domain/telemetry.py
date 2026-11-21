@@ -72,6 +72,9 @@ class TraceQuery(Contract):
     cursor: Cursor | None
 
 
+type Query = MetricsQuery | DependencyQuery | LogQuery | DeploymentsQuery | TraceQuery
+
+
 class QueryRejected(Exception):
     """The source can't answer this query as asked. `code` is the tool error code."""
 
