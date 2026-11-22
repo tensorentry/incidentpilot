@@ -124,3 +124,13 @@ def check_selector(
         record.window is not None and record.window.contains(selector.window)
     ):
         raise SelectorError("selected window is outside the series")
+
+
+def whole_selector(
+    row: EvidenceDraft | EvidenceRecord, evidence_id: EvidenceId
+) -> EvidenceSelector:
+    """A selector for a whole committed row. Only a series narrows, to its own window."""
+    fields: dict[str, object] = {"kind": row.kind, "evidence_id": evidence_id}
+    if row.kind is EvidenceKind.METRIC_SERIES_WINDOW:
+        fields["window"] = row.window
+    return EVIDENCE_SELECTOR_ADAPTER.validate_python(fields)

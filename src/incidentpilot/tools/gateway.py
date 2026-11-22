@@ -28,9 +28,9 @@ from uuid import uuid5
 from pydantic import JsonValue
 
 from incidentpilot.domain.canonical import sha256_digest
-from incidentpilot.domain.enums import EvidenceKind, ToolErrorCode, ToolName, ToolStatus
-from incidentpilot.domain.evidence import EVIDENCE_SELECTOR_ADAPTER, EvidenceDraft, EvidenceSelector
-from incidentpilot.domain.ids import EvidenceId, InvocationId, SnapshotId
+from incidentpilot.domain.enums import ToolErrorCode, ToolName, ToolStatus
+from incidentpilot.domain.evidence import EvidenceSelector, whole_selector
+from incidentpilot.domain.ids import InvocationId, SnapshotId
 from incidentpilot.domain.snapshot import ServiceGraph
 from incidentpilot.domain.telemetry import (
     DependencyQuery,
@@ -98,14 +98,6 @@ async def load_scope(connection: Connection, lease: Lease) -> Scope:
     )
 
 
-def selector(draft: EvidenceDraft, evidence_id: EvidenceId) -> EvidenceSelector:
-    """A selector for a whole committed row. Only a series narrows by window."""
-    fields: dict[str, object] = {"kind": draft.kind, "evidence_id": evidence_id}
-    if draft.kind is EvidenceKind.METRIC_SERIES_WINDOW:
-        fields["window"] = draft.window
-    return EVIDENCE_SELECTOR_ADAPTER.validate_python(fields)
-
-
 class ToolGateway:
     def __init__(
         self,
@@ -165,7 +157,7 @@ class ToolGateway:
         async with fenced_transaction(connection, lease):
             for draft in result.records:
                 stored = await commit_evidence(connection, lease, draft)
-                refs.append(selector(draft, stored.evidence_id))
+                refs.append(whole_selector(draft, stored.evidence_id))
                 records.append(
                     {"evidence": refs[-1].model_dump(mode="json"), "content": stored.content}
                 )
