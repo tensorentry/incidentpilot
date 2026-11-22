@@ -154,6 +154,8 @@ class StopReason(StrEnum):
     PROVIDER_FAILURE = "provider_failure"
     TURN_LIMIT_REACHED = "turn_limit_reached"
     BUDGET_EXHAUSTED = "budget_exhausted"
+    DEADLINE_REACHED = "deadline_reached"
+    FINALIZATION_RESERVE_REACHED = "finalization_reserve_reached"
 
 
 class ValidationStageStatus(StrEnum):
