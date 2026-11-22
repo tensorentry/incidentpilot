@@ -74,7 +74,7 @@ To find a task's commit, run `git log --grep='T0.1'`.
 | T4.3 | Gateway with evidence-before-exposure, one tool | done | [T4.3](tasks/T4.3.md) |
 | T4.4 | Remaining four tools | done | [T4.4](tasks/T4.4.md) |
 | T4.5 | Provider call gate with minimal ledger | done | [T4.5](tasks/T4.5.md) |
-| T4.6 | Bounded briefing builder | todo | |
+| T4.6 | Bounded briefing builder | done | [T4.6](tasks/T4.6.md) |
 | T4.7 | InvestigatorRunner and prompt | todo | |
 | T4.8 | Application-generated abstention fallback | todo | |
 | T4.9 | Structural validator wired into publication | todo | |
