@@ -5,7 +5,9 @@ Tests can't see each other's rows, and parallel test processes, as mutation test
 runs, can't collide. The template is rebuilt whenever the persistence code changes.
 """
 
+import socket
 from collections.abc import Iterator
+from typing import Any
 
 import psycopg
 import pytest
@@ -25,6 +27,24 @@ from tests.integration.harness import (
     scratch,
     sweep,
 )
+
+# PostgreSQL is the only server these tests may reach. A model provider never is.
+LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+_lookup = socket.getaddrinfo
+
+
+def _local_only(host: Any, *args: Any, **kwargs: Any) -> Any:
+    if host not in LOCAL_HOSTS:
+        raise OSError(f"the integration tests reach only the local database, not {host}")
+    return _lookup(host, *args, **kwargs)
+
+
+@pytest.fixture(autouse=True)
+def only_the_database(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A proxy setting in the environment keeps an HTTP client from asking the OS for
+    # one, which can crash a forked process on macOS.
+    monkeypatch.setenv("no_proxy", "*")
+    monkeypatch.setattr(socket, "getaddrinfo", _local_only)
 
 
 @pytest.fixture(scope="session")

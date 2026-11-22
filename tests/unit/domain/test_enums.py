@@ -123,12 +123,14 @@ def test_recommendation_kinds_cover_spec_section_10_1() -> None:
     assert values(RecommendationKind) == {"diagnostic", "simulation_candidate"}
 
 
-def test_stop_reasons_are_the_four_errata_e5_names() -> None:
+def test_stop_reasons_are_the_errata_e5_names() -> None:
     assert values(StopReason) == {
         "model_refused",
         "provider_failure",
         "turn_limit_reached",
         "budget_exhausted",
+        "deadline_reached",
+        "finalization_reserve_reached",
     }
 
 

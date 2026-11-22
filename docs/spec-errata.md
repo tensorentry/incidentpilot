@@ -125,6 +125,7 @@ stateDiagram-v2
 - `ReportCandidate` is the only schema the model sees: `diagnostic_outcome`, `observations`, `hypotheses`, `root_causes`, `impact`, `alternatives`, `recommendations`, `limitations`.
 - `DiagnosisReport` wraps a validated candidate with application-written `identity`, `execution` and `validation` sections. `schema_version`, `investigation_id`, `snapshot_id` and `termination_reason` move there.
 - `CandidateOrStop` is `Candidate(ReportCandidate) | Stop(reason, detail)`. `reason` is an enum covering refusal, provider failure, turn exhaustion and budget stop.
+  - *Amended 2026-11-21 (T4.7):* a budget stop names the limit that ended the run: `budget_exhausted` for spend or requests, `deadline_reached` for the deadline, and `finalization_reserve_reached` when diagnostics stop to leave the reserve (§11.3). Each matches a `TerminationReason`.
 
 ## E6. Oracle and publication
 

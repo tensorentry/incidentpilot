@@ -560,8 +560,9 @@ def test_a_stop_carries_a_bounded_detail() -> None:
     for detail in ["", "x" * (MAX_TEXT + 1)]:
         with pytest.raises(ValidationError):
             parse(Stop, {"reason": "provider_failure", "detail": detail})
+    # Cancellation is the application's decision, never the runner's.
     with pytest.raises(ValidationError):
-        parse(Stop, {"reason": "deadline_reached", "detail": "Ran out of time"})
+        parse(Stop, {"reason": "cancelled", "detail": "Cancelled by its owner"})
 
 
 def test_a_full_report_is_accepted_and_digestible() -> None:
